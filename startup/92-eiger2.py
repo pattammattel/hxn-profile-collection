@@ -154,6 +154,7 @@ class EigerFileStoreHDF5(FileStoreBase):
 
         logger.debug("Inserting resource with filename %s", self._fn)
         self._generate_resource(res_kwargs)
+        # print(self._asset_docs_cache)
 
         return staged
 
@@ -283,7 +284,7 @@ class EigerSingleTriggerV33(SingleTriggerV33):
 
 
 
-class SRXEiger(EigerSingleTriggerV33, EigerDetector):
+class HXNEiger(EigerSingleTriggerV33, EigerDetector):
     total_points = Cpt(Signal,
                        value=1,
                        doc="The total number of points to be taken")
@@ -409,7 +410,7 @@ class SRXEiger(EigerSingleTriggerV33, EigerDetector):
         self._acquisition_signal.put(0).wait()
 
 try:
-    eiger2 = SRXEiger('XF:03IDC-ES{Det:Eiger1M}',
+    eiger2 = HXNEiger('XF:03IDC-ES{Det:Eiger1M}',
                        name='eiger2',
                        # read_attrs=['hdf5', 'cam', 'stats1'])
                        read_attrs=['hdf5', 'cam'])

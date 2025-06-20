@@ -158,16 +158,16 @@ def move_energy(e,zpz_,harmonic = -1):
 
     #cbpm_on(True)
 
-def move_energy_mll(e, hmll_z = 0,sbz_=0, harmonic = -1):
+def move_energy_mll(e, hmll_z = 0,vmll_z=0, harmonic = -1):
 
     yield from Energy.move(e, 
                            harmChoice=harmonic,
                            moveMonoPitch=False, 
                            moveMirror = "ignore")
 
-    sbz_pos_ = sbz.position
-    if abs(sbz_- sbz_pos_)>1:
-        yield from bps.mov(sbz,np.round(sbz_,1))
+    vmll_pos_ = hmll.hz.position
+    if abs(vmll_z- vmll_pos_)>1:
+        yield from bps.mov(vmll.vz,np.round(vmll_z,1))
 
     hmll_hz_pos = hmll.hz.position
     if abs(hmll_z-hmll_hz_pos)>1:
@@ -409,21 +409,25 @@ def generateEList_MLL_2(path_to_parameter_file, highEStart = False):
     #lens increament
 
     high_hmll = XANESParam['high_e_hmll_z']
-    high_sbz = XANESParam['high_e_sbz']
-    low_hmll = XANESParam['high_e_hmll_z']+9
-    low_sbz = XANESParam['high_e_sbz']-39
+    high_vmll = XANESParam['high_e_vmll_z']
+    low_hmll = XANESParam['high_e_hmll_z']+30
+    #high_sbz = XANESParam['high_e_sbz']
+    #low_sbz = XANESParam['high_e_sbz']-39
+    low_vmll = XANESParam['high_e_vmll_z']+39
 
 
     hmll_z_slope = (high_hmll-low_hmll)/(high_e-low_e)
-    sbz_slope = (high_sbz-low_sbz)/(high_e-low_e)
-    print(sbz_slope)
+    vmll_z_slope = (high_vmll-low_vmll)/(high_e-low_e)
+    #sbz_slope = (high_sbz-low_sbz)/(high_e-low_e)
+    #print(sbz_slope)
 
 
     hmll_list = high_hmll + (e_list['energy'] - high_e)*hmll_z_slope
-    sbz_list = high_sbz + (e_list['energy'] - high_e)*sbz_slope
+    vmll_list = high_vmll + (e_list['energy'] - high_e)*vmll_z_slope
+    #sbz_list = high_sbz + (e_list['energy'] - high_e)*sbz_slope
     
     e_list['hmll_hz'] = hmll_list
-    e_list['sbz'] = sbz_list
+    e_list['vmll_hz'] = vmll_list
 
 
     #return the dataframe
@@ -876,8 +880,6 @@ def run_mll_xanes(path_to_parameter_file,do_confirm =True):
 
     tot_time_ = (image_scan_i["x_num"]*image_scan_i["y_num"]*image_scan_i["exposure"]*len(e_list))
     tot_time = tot_time_/3600
-    overhead = 1.5
-    end_datetime = time.ctime(time.time()+tot_time_*overhead)
     overhead = 1.25
     end_datetime = time.ctime(time.time()+tot_time_*overhead)
 
@@ -926,17 +928,17 @@ def run_mll_xanes(path_to_parameter_file,do_confirm =True):
                 yield from bps.sleep(120)
 
                 #redo the previous energy
-                e_t, hmll_hz_t,sbz_t, *others = e_list.iloc[i-1]
+                e_t, hmll_hz_t,vmll_vz_t, *others = e_list.iloc[i-1]
 
                 #turn off the beamdump marker
                 beamDumpOccured = False
                 
             else:
                 #unwrap df row for energy change
-                e_t, hmll_hz_t,sbz_t, *others = e_list.iloc[i]
+                e_t, hmll_hz_t,vmll_vz_t, *others = e_list.iloc[i]
             
             print("energy_change")
-            yield from move_energy_mll(e_t,hmll_z = hmll_hz_t,sbz_ = sbz_t)
+            yield from move_energy_mll(e_t,hmll_z = hmll_hz_t,vmll_z = vmll_vz_t)
             print("energy_change done")
             
             #open fast shutter to check if ic3 reading is satistactory

@@ -22,7 +22,7 @@ def get_current_position(zp_flag = True):
             sbz_pos = sbz.position
             th = dsth.position
             roi = {
-                "dssx": fx, "dsy": fy, "dsz": fz,
+                "dssx": fx, "dssy": fy, "dssz": fz,
                 "dsx": cx, "dsy": cy, "dsz": cz,
                 "sbz": sbz_pos, "dsth": th,
             }

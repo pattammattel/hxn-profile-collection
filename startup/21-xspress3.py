@@ -19,7 +19,7 @@ class Xspress3FileStoreHXN(Xspress3FileStore):
         self._locked_key_list = self._staged == Staged.yes
         res = super().read()
         for k, v in self._datum_uids.items():
-            res[k] = v[0]
+            res[k] = v.pop(0)
         return res
     
     def stage(self):
@@ -140,7 +140,7 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
         super().__init__(prefix, configuration_attrs=configuration_attrs,
                          read_attrs=read_attrs, **kwargs)
         self._dispatch_cid = None
-        self._spec_saved = threading.Event()
+        # self._spec_saved = threading.Event()
         self.hdf5.stage_sigs.update([(self.hdf5.blocking_callbacks,'No')])
         self.hdf5.stage_sigs.update([(self.hdf5.compression,'szip')])
 
@@ -165,9 +165,9 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
                 break
 
         # clear any existing callback
-        if self._dispatch_cid is not None:
-            self.hdf5.num_captured.unsubscribe(self._dispatch_cid)
-            self._dispatch_cid = None
+        # if self._dispatch_cid is not None:
+        #     self.hdf5.num_captured.unsubscribe(self._dispatch_cid)
+        #     self._dispatch_cid = None
 
         # always install the callback
         def _handle_spectrum_capture(old_value, value, timestamp, **kwargs):
@@ -181,20 +181,20 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
                 return
             # grab the time and the previous value from the callback payload
             trigger_time = timestamp
-            self._abs_trigger_count = old_value
+            # self._abs_trigger_count = old_value
             # dispatch for all of the channels
-            for sn in self.read_attrs:
-                if sn.startswith('channel') and '.' not in sn:
-                    ch = getattr(self, sn)
-                    self.dispatch(ch.name, trigger_time)
+            # for sn in self.read_attrs:
+            #     if sn.startswith('channel') and '.' not in sn:
+            #         ch = getattr(self, sn)
+            #         self.dispatch(ch.name, trigger_time)
 
-            self._abs_trigger_count = value
-            self._spec_saved.set()
+            # self._abs_trigger_count = value
+            # self._spec_saved.set()
 
         # do the actual subscribe
-        self._dispatch_cid = self.hdf5.num_captured.subscribe(
-            _handle_spectrum_capture,
-            run=False)
+        # self._dispatch_cid = self.hdf5.num_captured.subscribe(
+        #     _handle_spectrum_capture,
+        #     run=False)
 
         return ret
 
@@ -206,15 +206,19 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
             return sts
 
         s = self.trigger_internal()  # IS IT CORRECT WAY TO TRIGGER ACQUISITION?
-        self._spec_saved.clear()
+        sts._finished()
+        return sts
+    
+        # self._spec_saved.clear()
 
         def monitor():
-            success = self._spec_saved.wait(60)
-            sts._finished(success=success)
+            # success = self._spec_saved.wait(60)
+            sts._finished(success=True)
 
         # hold a ref for gc reasons
         self._th = threading.Thread(target=monitor)
         self._th.start()
+        
 
         return sts
 

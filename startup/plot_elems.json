@@ -1,29 +1,31 @@
 {
       "roi_elems": [
-            "Ni",
-            "Mn",
-            "Co",
-            "Cr",
-            "W_L",
-            "As",
-            "Al",
-            "Ti",
+            "Au_L",
+            "Au_M",
+            "Pt_L",
+            "Fe",
+            "Zn",
+            "Fe",
+            "K",
+            "P",
             "Si",
             "Cu",
-            "La",
-            "Mo_L",
-            "Zn",
-            "Te",
+            "Cl",
+            "S",
+            "Br",
             "Ar",
-            "Fe"
+            "Ni",
+            "Sr_L"
       ],
       "live_plot_elems": [
-            "Ni",
-            "Mn",
-            "Co",
-            "Cr"
+            "Au_L",
+            "Au_M",
+            "Pt_L",
+            "Fe",
+            "Zn",
+            "Fe"
       ],
       "line_plot_elem": [
-            "Ni"
+            "Au_L"
       ]
 }

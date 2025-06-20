@@ -432,7 +432,7 @@ def mov_zpz1(pos):
 
 def mll_z_alignment(z_motor, z_start, z_end, z_num, mot, start, end, num, acq_time, elem='Pt_L',mon='sclr1_ch4',lin_flag = False):
 
-    """usage: <mll_z_alignment(sbz,-20,20,10,dssy,-0.5,0.5,100,0.05)"""
+    """usage: <mll_z_alignment(sbz,-20,20,10,dssy,-0.5,0.5,100,0.05, elem = 'Pt_L')"""
 
     z_pos=np.zeros(z_num+1)
     fit_size=np.zeros(z_num+1)
