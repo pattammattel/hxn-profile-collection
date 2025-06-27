@@ -1,10 +1,10 @@
 {
       "roi_elems": [
-            "Au_L",
-            "Au_M",
-            "Pt_L",
-            "Fe",
-            "Zn",
+            "Ti",
+            "Pd_L",
+            "Eu_L",
+            "Te_L",
+            "Mo_L",
             "Fe",
             "K",
             "P",
@@ -18,14 +18,12 @@
             "Sr_L"
       ],
       "live_plot_elems": [
-            "Au_L",
-            "Au_M",
-            "Pt_L",
-            "Fe",
-            "Zn",
-            "Fe"
+            "Ti",
+            "Pd_L",
+            "Eu_L",
+            "Te_L"
       ],
       "line_plot_elem": [
-            "Au_L"
+            "Ti"
       ]
 }

@@ -10,6 +10,7 @@ import itertools
 import sys
 import numpy as np
 from pathlib import PurePath
+from enum import Enum
 import traceback
 from collections import OrderedDict
 from ophyd.areadetector.base import ADComponent
