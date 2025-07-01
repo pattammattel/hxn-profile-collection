@@ -997,9 +997,11 @@ def run_diff_json(path_to_json,tracking_file = None,do_confirm =True):
     angle_info = diff_params["angle_info"]
     print(angle_info)
     angles = np.arange(angle_info["start"],
-                         angle_info["end"]+angle_info["angle_step"]/2,
+                         angle_info["end"]+(angle_info["angle_step"]/2),
                          angle_info["angle_step"]
                          )
+    
+    print(f"{angles = }")
 
     #angles = np.linspace(angle_info["start"],
     #                   angle_info["end"],
