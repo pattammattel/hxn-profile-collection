@@ -123,7 +123,7 @@ class RunNormalizerHXN(RunNormalizer):
         return super().start(doc)
     
     def descriptor(self, doc):
-        if self._rebuild_stream:
+        if self._rebuild_stream and (doc["name"] == "primary"):
             self._descriptor_uid = doc["uid"]
             # Determine the channel numbers from the data keys, e.g. xspress3_ch1 --> int(1), 1-based index
             self._channel_nums = sorted([int(k[-1]) for k in doc['data_keys'].keys() if k.startswith('xspress3_ch')])
