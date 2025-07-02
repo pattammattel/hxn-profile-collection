@@ -5,6 +5,7 @@ import os
 import time
 import uuid
 import warnings
+import ophyd
 import pandas as pd
 from collections import deque
 from datetime import datetime, timedelta, tzinfo
@@ -36,36 +37,16 @@ ipython.run_line_magic("matplotlib", "")
 
 plt.ion()
 
-
-import certifi
-import ophyd
-import pandas as pd
-import pymongo
-import six
-from ophyd.signal import EpicsSignalBase
-
-import certifi
-import ophyd
-import pandas as pd
-import pymongo
-import six
 from ophyd.signal import EpicsSignalBase
 
 EpicsSignalBase.set_defaults(timeout=10, connection_timeout=10)
 
-# Set up a Broker.
-# TODO clean this up
-from bluesky_kafka import Publisher
-from databroker.v0 import Broker
-from databroker.assets.mongo import Registry
-from databroker.headersource.core import doc_or_uid_to_uid
-from databroker.headersource.mongo import MDS
-from jsonschema import validate as js_validate
-from pymongo import MongoClient
+os.chdir('/nsls2/data2/hxn/shared/config/bluesky/profile_collection/startup')
 
 os.environ["PPMAC_HOST"] = "xf03idc-ppmac1"
 
-os.chdir('/nsls2/data2/hxn/shared/config/bluesky/profile_collection/startup')
+
+#### Setup CompositeRegistry for data submission ###
 
 bootstrap_servers = os.getenv("BLUESKY_KAFKA_BOOTSTRAP_SERVERS", None)
 if bootstrap_servers is None:
@@ -80,6 +61,22 @@ kafka_password = os.getenv("BLUESKY_KAFKA_PASSWORD", None)
 if kafka_password is None:
     msg = "The 'BLUESKY_KAFKA_PASSWORD' environment variable must be set."
     raise RuntimeError(msg)
+
+# TODO clean up the import
+import certifi
+import ophyd
+import pandas as pd
+import numpy as np
+import pymongo
+import six
+
+from bluesky_kafka import Publisher
+from databroker.v0 import Broker
+from databroker.assets.mongo import Registry
+from databroker.headersource.core import doc_or_uid_to_uid
+from databroker.headersource.mongo import MDS
+from jsonschema import validate as js_validate
+from pymongo import MongoClient
 
 kafka_publisher = Publisher(
         topic="hxn.bluesky.datum.documents",
@@ -99,43 +96,15 @@ kafka_publisher = Publisher(
         flush_on_stop_doc=True,
     ) if not os.environ.get('AZURE_TESTING') else None   # Disable on CI
 
-# DB1
-db1_name = 'rs'
-#db1_addr = 'mongodb://xf03id1-mdb01:27017,xf03id1-mdb02:27017,xf03id1-mdb03:27017'
-db1_addr = 'mongodb://xf03id1-mdb02:27017,xf03id1-mdb03:27017'
-_mds_config_db1 = {'host': db1_addr,
-                   'port': 27017,
-                   'database': 'datastore-2',
-                   'timezone': 'US/Eastern'}
-
-_fs_config_db1 = {'host': db1_addr,
-                  'port': 27017,
-                  'database': 'filestore-2'}
-
 # Benchmark file
 #f_benchmark = open("/home/xf03id/benchmark.out", "a+")
-f_benchmark = open("/nsls2/data/hxn/shared/config/bluesky/profile_collection/benchmark.out", "a+")
+try:
+    f_benchmark = open("/nsls2/data/hxn/shared/config/bluesky/profile_collection/benchmark.out", "a+")
+except:
+    f_benchmark = None
 datum_counts = {}
 
-def sanitize_np(val):
-    "Convert any numpy objects into built-in Python types."
-    if isinstance(val, (np.generic, np.ndarray)):
-        if np.isscalar(val):
-            return val.item()
-        return val.tolist()
-    return val
-
-def apply_to_dict_recursively(d, f):
-    for key, val in d.items():
-        if hasattr(val, 'items'):
-            d[key] = apply_to_dict_recursively(val, f)
-        d[key] = f(val)
-
-def _write_to_file(col_name, method_name, t1, t2):
-        f_benchmark.write(
-            "{0}: {1}, t1: {2} t2:{3} time:{4} \n".format(
-                col_name, method_name, t1, t2, (t2-t1),))
-        f_benchmark.flush()
+from hxntools.CompositeBroker import sanitize_np,apply_to_dict_recursively
 
 
 # Define a thread-safe cache for datum and resource documents
@@ -352,88 +321,14 @@ class CompositeRegistry(Registry):
         self._bulk_insert_datum(self._datum_col, resource_uid, d_ids, datum_kwarg_list)
         return d_ids
 
-
-mds_db1 = MDS(_mds_config_db1, auth=False)
-db1 = Broker(mds_db1, CompositeRegistry(_fs_config_db1))
-
-# wrapper for two databases
-class CompositeBroker(Broker):
-    """wrapper for two databases"""
-
-    # databroker.headersource.MDSROTemplate
-    def _bulk_insert_events(self, event_col, descriptor, events, validate, ts):
-
-        descriptor_uid = doc_or_uid_to_uid(descriptor)
-
-        to_write = []
-        for ev in events:
-            data = dict(ev['data'])
-
-            # Replace any filled data with the datum_id stashed in 'filled'.
-            for k, v in six.iteritems(ev.get('filled', {})):
-                if v:
-                    data[k] = v
-            # Convert any numpy types to native Python types.
-            apply_to_dict_recursively(data, sanitize_np)
-            timestamps = dict(ev['timestamps'])
-            apply_to_dict_recursively(timestamps, sanitize_np)
-
-            # check keys, this could be expensive
-            if validate:
-                if data.keys() != timestamps.keys():
-                    raise ValueError(
-                        BAD_KEYS_FMT.format(data.keys(),
-                                            timestamps.keys()))
-            ev_uid = ts + '-' + ev['uid']
-
-            ev_out = dict(descriptor=descriptor_uid, uid=ev_uid,
-                          data=data, timestamps=timestamps,
-                          time=ev['time'],
-                          seq_num=ev['seq_num'])
-
-            to_write.append(pymongo.InsertOne(ev_out))
-
-        event_col.bulk_write(to_write, ordered=True)
-
-    # databroker.headersource.MDSROTemplate
-    # databroker.headersource.MDSRO(MDSROTemplate)
-    def _insert(self, name, doc, event_col, ts):
-        for desc_uid, events in doc.items():
-            # If events is empty, mongo chokes.
-            if not events:
-                continue
-            self._bulk_insert_events(event_col,
-                                     descriptor=desc_uid,
-                                     events=events,
-                                     validate=False, ts=ts)
+# Compose the databroker with CompositeRegistry
+from hxntools.CompositeBroker import HXN_compose_db
 
 
-    def insert(self, name, doc):
+### Databroker ###
+db = HXN_compose_db(reg=CompositeRegistry)
 
-        if name == "start":
-            f_benchmark.write("\n scan_id: {} \n".format(doc['scan_id']))
-            f_benchmark.flush()
-            datum_counts = {}
 
-        ts =  str(datetime.now().timestamp())
-
-        if name in {'bulk_events'}:
-            ret2 = self._insert(name, doc, db1.mds._event_col, ts)
-        elif name == 'event_page':
-            import event_model
-            for ev_doc in event_model.unpack_event_page(doc):
-                db1.insert('event', ev_doc)
-            ret2 = None
-        else:
-            ret2 = db1.insert(name, doc)
-        return ret2
-
-db = CompositeBroker(mds_db1, CompositeRegistry(_fs_config_db1))
-db.name = 'hxn'
-from hxntools.handlers import register as _hxn_register_handlers
-
-_hxn_register_handlers(db)
-del _hxn_register_handlers
 # do the rest of the standard configuration
 from IPython import get_ipython
 from nslsii import configure_base, configure_olog

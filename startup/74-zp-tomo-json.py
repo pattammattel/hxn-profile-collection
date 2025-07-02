@@ -139,6 +139,8 @@ def zp_tomo_2d_scan_loop(angle,dets_,x_start,x_end,x_num,y_start,y_end,y_num,exp
                         y_num//4, 
                         exp
                         )
+            
+
 
 def zp_tomo_scan_to_loop(angle, tomo_params, ic_init,tracking_file = None,add_low_res_scan=False):
 
@@ -440,11 +442,12 @@ def run_zp_tomo_json(path_to_json,tracking_file = None,add_low_res_scan = False)
             beamDumpOccured = False
 
         if not angle in np.array(tomo_params["remove_angles"]):
+            print(f"{angle = } ")
             #tomo scan at a single angle
             yield from zp_tomo_scan_to_loop(angle, tomo_params,ic_0,tracking_file=tracking_file, add_low_res_scan=add_low_res_scan)
 
         else:
-            print(f"{angle} skipped")
+            print(f"{angle = } skipped")
             pass
 
         

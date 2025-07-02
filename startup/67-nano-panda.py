@@ -935,16 +935,16 @@ def scan_and_fly_2dpd(detectors, xcenter, xrange, xnum, ystart, ystop, ynum, dwe
                                 wait=True)
         yield from panda_kickoff()
 
-        panda_h5_path = os.path.realpath(os.path.join(panda_flyer.panda.data.hdf_directory.get(),panda_flyer.panda.data.hdf_file_name.get()))
-        panda_h5_link = '/nsls2/data2/hxn/legacy/home/home/zgao/panda_data.h5'
+        # panda_h5_path = os.path.realpath(os.path.join(panda_flyer.panda.data.hdf_directory.get(),panda_flyer.panda.data.hdf_file_name.get()))
+        # panda_h5_link = '/nsls2/data2/hxn/legacy/users/startup_parameters/panda_data.h5'
 
-        try:
-            if os.path.exists(panda_h5_link):
-                os.remove(panda_h5_link)
+        # try:
+        #     if os.path.exists(panda_h5_link):
+        #         os.remove(panda_h5_link)
 
-            os.symlink(panda_h5_path,panda_h5_link)
-        except:
-            pass
+        #     os.symlink(panda_h5_path,panda_h5_link)
+        # except:
+        #     pass
 
         if verbose:
             toc(t_startfly, str='TIMER (STEP) - PANDA STARTED')
@@ -1152,10 +1152,10 @@ def pt_fly2dcontpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_star
             yield from bps.abs_set(panda1.pulse1.delay,(exposure_time-dead_time)/2.0/position_supersample)
             yield from bps.abs_set(panda1.pulse1.delay_units,'s')
             yield from bps.abs_set(panda1.pulse1.pulses,position_supersample)
-            
+
             yield from bps.abs_set(panda1.pulse2.width_units,'s')
             yield from bps.abs_set(panda1.pulse2.width,exposure_time-dead_time)
-            
+
             yield from bps.abs_set(panda1.pulse2.delay,0.0016)
             yield from bps.abs_set(panda1.pulse2.delay_units,'s')
             yield from bps.abs_set(panda1.pulse2.pulses,1)

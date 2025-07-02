@@ -148,8 +148,8 @@ def rasmi_x_ref():
     return (caget("XF:03IDC-ES{Pico:1}POS_1")-caget("XF:03IDC-ES{Pico:1}POS_2"))/0.85/1e6 - ptssx.user_readback.get()*(1.666)
 
 def rasmi_interf_calib_scan(npoints):
-    yield from bps.mov(pt_tomo.th,110)
-    step = 135/npoints
+    yield from bps.mov(pt_tomo.th,-114)
+    step = 360/npoints
     for i in range(npoints):
         yield from bps.sleep(1)
         yield from bps.mov(pt_tomo.ssy,5)
@@ -162,4 +162,4 @@ def rasmi_interf_calib_scan(npoints):
     yield from bps.sleep(1)
     yield from bps.mov(pt_tomo.ssy,0)
     yield from bps.sleep(1)
-    yield from bps.mov(pt_tomo.th,180)
+    yield from bps.mov(pt_tomo.th,0)

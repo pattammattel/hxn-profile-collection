@@ -550,8 +550,8 @@ def foil_calib_scan_list(elem_line = "Mn_K", saveLogFolder =  "/data/users/curre
     edgeE = xraydb.xray_edge(elem_line.split('_')[0],
                      elem_line.split('_')[1], 
                      True)/1000
-    startE = np.around(edgeE-0.03,4)
-    endE = np.around(edgeE+0.060,4)
+    startE = np.around(edgeE-0.05,4)
+    endE = np.around(edgeE+0.100,4)
     
     energies = np.arange(startE,endE,0.0005)
     
@@ -593,8 +593,7 @@ def foil_calib_scan_list(elem_line = "Mn_K", saveLogFolder =  "/data/users/curre
     plt.show()
 
 def foil_calib_scan(elem_line = "Cu_K", step_size_ev = 0.5, exp_time = 0.5,
-                       saveLogFolder = "/data/users/current_user", 
-                       save_as = "Au_Foil_calib_July11_2024"):
+                       saveLogFolder = "/data/users/current_user"):
 
     """absolute start and end E
     
@@ -615,9 +614,9 @@ def foil_calib_scan(elem_line = "Cu_K", step_size_ev = 0.5, exp_time = 0.5,
 
     print(f"{endE=},{startE=},{dUgap=}")
     
-    # yield from Energy.move(startE, moveMonoPitch=False,moveMirror = "ignore")
-    # yield from d2scan(dets_fs,num_steps, e, 0, dE, ugap, 0, dUgap, exp_time)
-    # plot_foil_calib(sid=-1, saveLogFolder = saveLogFolder, save_as = save_as)
+    yield from Energy.move(startE, moveMonoPitch=False,moveMirror = "ignore")
+    yield from d2scan(dets_fs,num_steps, e, 0, dE, ugap, 0, dUgap, exp_time)
+    plot_foil_calib(sid=-1, saveLogFolder = saveLogFolder, save_as = elem_line)
 
 
 def foil_calib_d2_scan(startE, endE, step_size_ev = 0.5, exp_time = 0.5,
@@ -626,7 +625,8 @@ def foil_calib_d2_scan(startE, endE, step_size_ev = 0.5, exp_time = 0.5,
 
     """absolute start and end E
     
-    Usage:<foil_calib_d2_scan(11.919-0.025,11.919+0.075,step_size_ev=1,exp_time=0.5,saveLogFolder='/data/users/current_user',save_as='Au_Foil_calib_Sep27_2024_12_26pm')
+    Usage:<foil_calib_d2_scan(11.919-0.025,11.919+0.075,step_size_ev=1,exp_time=0.5,
+    saveLogFolder='/data/users/current_user',save_as='Au_Foil_calib_Sep27_2024_12_26pm')
 
     
     """
@@ -640,7 +640,7 @@ def foil_calib_d2_scan(startE, endE, step_size_ev = 0.5, exp_time = 0.5,
     plot_foil_calib(sid=-1, saveLogFolder = saveLogFolder, save_as = save_as)
 
     
-def plot_foil_calib(sid=-1, saveLogFolder = "/data/users/current_user",save_as = "Au_Foil_calib_Jan2024"):
+def plot_foil_calib(sid=-1, saveLogFolder = "/data/users/current_user",save_as = "Au_L3"):
     
     h = db[int(sid)]
     sd = h.start["scan_id"]
@@ -667,10 +667,14 @@ def plot_foil_calib(sid=-1, saveLogFolder = "/data/users/current_user",save_as =
     edge_pos = en_[np.argmax(np.gradient(spec))]
     ax.axvline(x = edge_pos)
     ax.text(edge_pos,np.max(spec)*0.1,f"{edge_pos = :.4f}")
+
+
+    filename = f'HXN_nanoXANES_{save_as}_calib_{time_}.csv'
+    #filename = f'HXN_nanoXANES_calib.csv'
+    dff.to_csv(os.path.join(saveLogFolder, filename), float_format= '%.5f')
     #bps.sleep(2)
     plt.legend()
     plt.savefig(os.path.join(saveLogFolder, f'{save_as}_{sd}.png'))
-    dff.to_csv(os.path.join(saveLogFolder, f'{save_as}_{sd}.csv'))
     plt.show()
 
 

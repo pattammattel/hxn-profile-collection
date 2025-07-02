@@ -106,7 +106,7 @@ def erf_fit(sid, elem, mon='sclr1_ch4', linear_flag=True):
         else:
             popt,pcov=curve_fit(erfunc4,xdata,ydata,p0=[edge_pos,0.05,0.5,0,0])
             fit_data=erfunc4(xdata,popt[0],popt[1],popt[2],popt[3],popt[4]);
-    plt.plot(xdata,fit_data)
+    plt.plot(xdata,fit_data, 'r')
     plt.title(f'{sid = }, edge = {popt[0] :.3f}, FWHM = {popt[1]*2354.8 :.2f} nm')
     return (popt[0],popt[1]*2.3548*1000.0)
 
@@ -432,7 +432,7 @@ def mov_zpz1(pos):
 
 def mll_z_alignment(z_motor, z_start, z_end, z_num, mot, start, end, num, acq_time, elem='Pt_L',mon='sclr1_ch4',lin_flag = False):
 
-    """usage: <mll_z_alignment(sbz,-20,20,10,dssy,-0.5,0.5,100,0.05)"""
+    """usage: <mll_z_alignment(sbz,-20,20,10,dssy,-0.5,0.5,100,0.05, elem = 'Pt_L')"""
 
     z_pos=np.zeros(z_num+1)
     fit_size=np.zeros(z_num+1)
@@ -532,7 +532,7 @@ def zp_z_alignment(z_start, z_end, z_num, mot, start, end, num, acq_time,
         yield from fly1dpd(dets_fast_fs, mot, start, end, num, acq_time)
         yield from bps.sleep(2)
         edge_pos,fwhm=erf_fit(-1,elem,mon,linear_flag=linFlag)
-        #yield from bps.mov(mot,edge_pos)
+        yield from bps.mov(mot,edge_pos)
         yield from bps.sleep(1)
         fit_size[i]= fwhm
         z_pos[i]=zp.zpz1.position
@@ -806,7 +806,7 @@ def zp_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time,
         yield from bps.movr(zps.smarz, dz)
 
 
-    return x,y
+    return dx,dz
 
 
 def calc_rot_alignment(first_sid = -10, last_sid =-1, elem = "Cr"):
@@ -899,7 +899,7 @@ def mll_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time, elem='Pt
 
     #moving back to intial y position
     yield from bps.mov(dssy, y_init)
-    print(f'{dx = :.2f}, {dz = :.2f}')
+    print(f'Relative motion: {dx = :.2f}, {dz = :.2f} and sbx by {-1*dx :.2f}')
 
     #if move_flag:
         #yield from bps.movr(smlld.dsx, dx)
@@ -911,12 +911,12 @@ def mll_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time, elem='Pt
     x = np.array(x)
     y = -np.array(y)
 
-    print(x)
-    print(y)
-    print(v)
+    # print(x)
+    # print(y)
+    # print(v)
     #caliFIle = open('rotCali','wb')
     #pickle.dump(y,CaliFile)
-    return v
+    return dx, dz
 
 
 def refit_rot_align(scan_list, elem, threshold):
@@ -1615,12 +1615,14 @@ def update_det_pos(det = "merlin", do_confirm = True):
 
 
 
-def find_45_degree(th_mtr,start_angle,end_angle,num, x_start, x_end, x_num, exp_time=0.02, elem="Pt_L", 
-                   save_name = 'pstv_45deg_calib'):
+def find_45_degree(th_mtr,start_angle,end_angle,num, x_start, x_end, x_num, exp_time=0.02, elem="Pt_L"):
 
 
     ''' Usage: find_45_degree(dsth,40,50,25,-5, 5,100, exp_time=0.02,elem="Au_L") '''
-
+    
+    time_ = datetime.now().strftime("%Y%m%d_%H%M%S")
+    save_name = f"find_45_{th_mtr.name}_{start_angle}_to_{end_angle}_{time_}"
+    header = "th wx wz x_sid"
 
     if th_mtr == dsth:
         x_mtr, z_mtr = dssx, dssz
@@ -1630,6 +1632,7 @@ def find_45_degree(th_mtr,start_angle,end_angle,num, x_start, x_end, x_num, exp_
 
     yield from bps.mov(th_mtr,start_angle)
     step = (end_angle-start_angle)/num
+    x_sid = np.zeros(num+1)
     w_x = np.zeros(num+1)
     w_z = np.zeros(num+1)
     th = np.zeros(num+1)
@@ -1638,6 +1641,7 @@ def find_45_degree(th_mtr,start_angle,end_angle,num, x_start, x_end, x_num, exp_
         l,r,c=square_fit(-1,elem)
         plt.close()
         w_x[i] = r-l
+        x_sid[i] = db[-1].start.get('scan_id')
         yield from fly1dpd(dets_fast_fs,z_mtr,x_start,x_end,x_num,exp_time)
         l,r,c=square_fit(-1,elem)
         plt.close()
@@ -1646,15 +1650,16 @@ def find_45_degree(th_mtr,start_angle,end_angle,num, x_start, x_end, x_num, exp_
         yield from bps.sleep(1)
         yield from bps.movr(th_mtr,step)
 
-        np.savetxt(f"/nsls2/data/hxn/legacy/users/Beamline_Performance/{save_name}.txt",np.column_stack([th,w_x,w_z]))
+        np.savetxt(f"/nsls2/data/hxn/legacy/users/Beamline_Performance/find_45_scans/{save_name}.txt",
+                   np.column_stack([th,w_x,w_z,x_sid]), header = header)
     plt.figure()
     plt.plot(th,w_x,'r+',th,w_z,'g-')
 
-    find_45_offset(f"/nsls2/data/hxn/legacy/users/Beamline_Performance/{save_name}.txt")
+    find_45_offset(f"/nsls2/data/hxn/legacy/users/Beamline_Performance/find_45_scans/{save_name}.txt")
     return th,w_x,w_z
 
 
-def find_45_offset(data_path = "/nsls2/data/hxn/legacy/users/Beamline_Performance/45deg_calib.txt"):
+def find_45_offset(data_path = "/nsls2/data/hxn/legacy/users/Beamline_Performance/find_45_scans/45deg_calib.txt"):
 
     """ usage :find_45_offset() """
 
@@ -2340,7 +2345,7 @@ def mll_to_nanobeam():
 
     yield from bps.movr(ssa2.hgap,-2,ssa2.vgap,-2,s5.hgap,-3.5,s5.vgap,-3.5)
 
-    do_motor_position_checks(check_list_after,message_string ="Failed to go to nanobeam position")
+    do_motor_position_checks(check_list_after,abs_tol = 5, message_string ="Failed to go to nanobeam position")
 
 
 def zp_to_nanobeam(peak_the_flux_after = False):

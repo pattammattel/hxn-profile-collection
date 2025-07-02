@@ -856,7 +856,7 @@ def diff_2d_scan(angle,dets_,fly_motors,x_start,x_end,x_num,y_start,y_end,y_num,
                         position_supersample = 10
                         )
 
-def diff_scan_to_loop(angle, diff_params, ic_init, do_y_offset = False,tracking_file = None):
+def diff_scan_to_loop(angle, diff_params, ic_init,tracking_file = None):
 
         #caput("XF:03IDC-ES{Merlin:2}HDF1:NDArrayPort","ROI1") #patch for merlin2 issuee
 
@@ -981,7 +981,7 @@ def diff_scan_to_loop(angle, diff_params, ic_init, do_y_offset = False,tracking_
 def run_diff_json(path_to_json,tracking_file = None,do_confirm =True):
 
 
-    """mll_diff_scan by taking parameters from a json file,
+    """diff_scan by taking parameters from a json file,
     TODO add angles smartly
 
     """
@@ -996,15 +996,17 @@ def run_diff_json(path_to_json,tracking_file = None,do_confirm =True):
     #create angle list for iteration
     angle_info = diff_params["angle_info"]
     print(angle_info)
-    # angles = np.arange(angle_info["start"],
-    #                     angle_info["end"]+angle_info["angle_step"],
-    #                     angle_info["angle_step"]
-    #                     )
+    angles = np.arange(angle_info["start"],
+                         angle_info["end"]+(angle_info["angle_step"]/2),
+                         angle_info["angle_step"]
+                         )
+    
+    print(f"{angles = }")
 
-    angles = np.linspace(angle_info["start"],
-                        angle_info["end"],
-                        int(1+abs(angle_info["end"] - angle_info["start"])/angle_info["angle_step"])
-                        )
+    #angles = np.linspace(angle_info["start"],
+    #                   angle_info["end"],
+    #                    int(1+abs(angle_info["end"] - angle_info["start"])/angle_info["angle_step"])
+    #                   )
     if "split_diff" in angle_info:
         split = int(angle_info["split_diff"])
         angles0 = angles.copy()
@@ -1074,7 +1076,7 @@ def run_diff_json(path_to_json,tracking_file = None,do_confirm =True):
 
     tot_time_ = (image_scan_i["x_num"]*image_scan_i["y_num"]*image_scan_i["exposure"]*len(angle_list))
     tot_time = tot_time_/3600
-    overhead = 1.5
+    overhead = 1.2
     end_datetime = time.ctime(time.time()+tot_time_*overhead)
     
     if do_confirm:
@@ -1283,7 +1285,7 @@ def run_diff_json(path_to_json,tracking_file = None,do_confirm =True):
                         break
 
                 if not angle in np.array(diff_params["remove_angles"]):
-                    yield from diff_scan_to_loop(angle, diff_params,ic_0,do_y_offset = do_y_offset)
+                    yield from diff_scan_to_loop(angle, diff_params,ic_0)
 
                     last_sid = int(caget('XF:03IDC-ES{Status}ScanID-I'))
 

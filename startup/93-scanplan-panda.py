@@ -1016,7 +1016,7 @@ def flyscan_pd(detectors, start_signal, total_points, dwell, *,
             #st.add_callback(lambda x: toc(t_startfly, str=f"  DETECTOR  {datetime.strftime(datetime.now(), '%Y-%m-%d %H:%M:%S.%f')}"))
 
         ## Wait a bit for detectors
-        yield from bps.sleep(np.minimum(np.maximum(0.5,dwell*100),3))
+        yield from bps.sleep(np.minimum(np.maximum(0.5,0.001*total_points),2))
         # st = yield from abs_set(xmotor, row_stop)
         progress_bar = tqdm.tqdm(total = total_points,unit='points')
 
