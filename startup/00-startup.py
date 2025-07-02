@@ -297,6 +297,7 @@ class CompositeRegistry(Registry):
             apply_to_dict_recursively(dm, sanitize_np)
             to_write.append(pymongo.InsertOne(dm))
             d_uids.append(dm['datum_id'])
+            tiled_document_cache.append("datum", {k:v for k, v in dm.items() if k != '_id'})
 
         col.bulk_write(to_write, ordered=False)
 

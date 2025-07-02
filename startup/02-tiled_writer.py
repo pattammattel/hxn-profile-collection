@@ -117,7 +117,7 @@ class RunNormalizerHXN(RunNormalizer):
         self._event_counter = 0        # Counter for the event documents, used to check the number of datums
 
     def start(self, doc):
-        if (doc['scan_name'] == 'NMC_1') and (doc['plan_name'] == 'rel_scan') and 'xspress3' in doc['detectors']:
+        if (doc.get('scan_name') == 'NMC_1') and (doc.get('plan_name') == 'rel_scan') and ('xspress3' in doc.get('detectors',[])):
             self._rebuild_stream = True
 
         return super().start(doc)
@@ -168,7 +168,7 @@ class RunNormalizerHXN(RunNormalizer):
                 super().datum(datum_doc)
             doc["note"] = doc.get("note", "") + "This run was modified to have unique datum_ids and channel numbers for xspress3 data."
 
-        super().stop(doc)
+        return super().stop(doc)
 
 
 api_key = os.environ.get("TILED_BLUESKY_WRITING_API_KEY_HXN")
@@ -193,9 +193,10 @@ def cache_retriever(name, doc):
                 tw(*item)    # item is a tuple (name, doc) or None
             else:
                 break        # No more items in the cache, we are done
-    else:
-        if item := tiled_document_cache.popleft():
-            tw(*item)     # While we're here, we can also process (one?) cached document -- this is debatable...
+    # else:
+    #     if item := tiled_document_cache.popleft():
+    #         print(f"Document is {item}")
+    #         tw(*item)     # While we're here, we can also process (one?) cached document -- this is debatable...
     tw(name, doc)
 
 # Subscribe the cache_retriever + TW
