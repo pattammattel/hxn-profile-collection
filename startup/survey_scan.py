@@ -223,8 +223,8 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
     print(np.shape(images))
     num_frame,nnx,nny = np.shape(images)
 
-    #mask = np.load('/data/users/2023Q3/Liu_2023Q3/NNCM_3.75V_004/mask.npy')
-    mask = np.load('/data/users/2025Q1/Huang_2025Q1/nc_104/mask.npy')
+    mask = np.load('/data/users/2025Q2/Liu_2025Q2/mask_p2NaNMC_002_full2.npy')
+    #mask = np.load('/data/users/2025Q2/Liu_2025Q2/diff_3_O3NCM_3.4V/mask.npy')
 
     for i in range(num_frame):
         if np.mod(i,500) ==0:
@@ -239,52 +239,24 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
             nx,ny = np.shape(t)
             global diff_array
             diff_array = np.zeros((nx,ny,num_frame))
-            #diff_array_l = np.zeros((158,ny,num_frame))
-            #diff_array_r = np.zeros((140,ny,num_frame))
-        #t[index] = 0
-        #t[mask == 1] = 0
-        #t[164,107] = 0
-        diff_array[:,:,i] = np.flipud(t) * mask
+            #diff_array = np.zeros((nx,248,num_frame))
+            #diff_array_d = np.zeros((nx,245,num_frame))
 
+        #diff_array[:,:,i] = np.flipud(t) #* mask
+        tmp = np.flipud(t) #* mask
+        #diff_array[:,:,i] = tmp[:,245:]
+        #diff_array_d[:,:,i] = tmp[:,:245]
+        diff_array[:,:,i] = np.flipud(tmp) *mask
 
-
-    #diff_array[22,255,:] = 0
-    #diff_array[296,281,:] = 0
-    #diff_array[91,221,:] = 0
-    #diff_array[440,381,:] = 0
-
-    #diff_array[diff_array > 200000] = 0
-    '''
-    #diff_array[diff_array > 1e4] = 0
-    diff_array[419,412,:] = 0
-    diff_array[431,408,:] = 0
-    diff_array[118,370,:] = 0
-    diff_array[145,357,:] = 0
-    diff_array[142,345,:] = 0
-    diff_array[57,462,:] = 0
-    diff_array[206,83,:] = 0
-    diff_array[115,348,:] = 0
-    diff_array[118,359,:] = 0
-    diff_array[446,385,:] = 0
-    '''
-    '''
-    diff_array[191,87,:] = 0
-    diff_array[124,57,:] = 0
-    diff_array[51,152,:] = 0
-    diff_array[114,113,:] = 0
-    diff_array[111,133,:] = 0
-    diff_array[134,122,:] = 0
-    '''
-    #if elem == 'roi':
     for i in range(num_frame):
         if i == 0:
             global roi
+            #roi = np.zeros(num_frame)
             roi = np.zeros(num_frame)
-            #roi_l = np.zeros(num_frame)
-            #roi_r = np.zeros(num_frame)
+            #roi_d = np.zeros(num_frame)
+        #roi[i] = np.sum(diff_array[:,:,i])
         roi[i] = np.sum(diff_array[:,:,i])
-        #roi_r[i] = np.sum(diff_array_r[:,:,i])
-        #roi_l[i] = np.sum(diff_array_l[:,:,i])
+        #roi_d[i] = np.sum(diff_array_d[:,:,i])
 
     global xrf
     if elem in df:
@@ -319,7 +291,7 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
             #print(hdr.start.plan_args['num'])
             xrf = np.reshape(xrf,(1,hdr.start.plan_args['num']))
             roi = np.reshape(roi,(1,hdr.start.plan_args['num']))
-            #roi2 = np.reshape(roi2,(1,hdr.start.plan_args['num']))
+            #roi_d = np.reshape(roi_d,(1,hdr.start.plan_args['num']))
         except:
             if hdr.start.plan_name == 'grid_scan':
                 xrf = np.reshape(xrf,(hdr.start.shape[0],hdr.start.shape[1]))
@@ -328,14 +300,14 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
                 y_data = df[hdr.start.motors[0]]
                 num_x = hdr.start.shape[0]
                 num_y = hdr.start.shape[1]
-                #roi2 = np.reshape(roi2,(hdr.start.shape[0],hdr.start.shape[1]))
+                #roi_d = np.reshape(roi_d,(hdr.start.shape[0],hdr.start.shape[1]))
                 extent = (hdr.start.plan_args['args'][2], hdr.start.plan_args['args'][1],hdr.start.plan_args['args'][6],hdr.start.plan_args['args'][5])
             elif hdr.start.plan_name == 'FlyPlan2D':
                 xrf = np.reshape(xrf,(hdr.start.shape[1],hdr.start.shape[0]))
                 roi = np.reshape(roi,(hdr.start.shape[1],hdr.start.shape[0]))
                 #roi_r = np.reshape(roi_r,(hdr.start.shape[1],hdr.start.shape[0]))
                 #roi_l = np.reshape(roi_l,(hdr.start.shape[1],hdr.start.shape[0]))
-                #roi2 = np.reshape(roi2,(hdr.start.shape[1],hdr.start.shape[0]))
+                #roi_d = np.reshape(roi_d,(hdr.start.shape[1],hdr.start.shape[0]))
                 extent = (hdr.start.plan_args['scan_end1'], hdr.start.plan_args['scan_start1'],hdr.start.plan_args['scan_end2'],hdr.start.plan_args['scan_start2'])
                 #x_motor = hdr['motor1']
                 if zp_flag:
@@ -358,10 +330,10 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
                 #x_data = np.asarray(df[x_motor])
                 #y_motor = hdr['motor2']
                 #y_data = np.asarray(df[y_motor])
-                x_data,y_data = hxntools.scan_info.get_scan_positions(hdr)
+                x_data,y_data = get_scan_positions(hdr)
                 xrf = np.reshape(xrf,(hdr.start.shape[1],hdr.start.shape[0]))
                 roi = np.reshape(roi,(hdr.start.shape[1],hdr.start.shape[0]))
-                #roi2 = np.reshape(roi2,(hdr.start.shape[1],hdr.start.shape[0]))
+                #roi_d = np.reshape(roi_d,(hdr.start.shape[1],hdr.start.shape[0]))
                 extent = (np.nanmin(x_data), np.nanmax(x_data),np.nanmax(y_data), np.nanmin(y_data))
                 num_x = hdr.start['shape'][0]
                 num_y = hdr.start['shape'][1]
@@ -391,7 +363,7 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
 
     #"""
 
-    fn = '/data/users/2025Q1/Huang_2025Q1/nm_104/'
+    fn = '/data/users/2025Q2/Liu_2025Q2/diff_O3NaNMC_0V/'
     
     if not os.path.exists(fn):
         os.makedirs(fn)
@@ -399,6 +371,8 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
     
     if save_flag:
         io.imsave(fn+scan_num+'_roi.tif',roi.astype(np.float32))
+        #io.imsave(fn+scan_num+'_roi_down.tif',roi_d.astype(np.float32))
         io.imsave(fn+scan_num+'_xrf.tif',xrf.astype(np.float32))
         io.imsave(fn+scan_num+'_diff_data.tif',diff_array.astype(np.float32))
+        #io.imsave(fn+scan_num+'_diff_data_down.tif',diff_array_d.astype(np.float32))
 

@@ -60,9 +60,19 @@ pt_fg_ch2 = HXN_FuncGen2('XF:03IDC-ES', name='pt_fg_ch2')
 RASMI_align_drift = np.load('/nsls2/data2/hxn/legacy/users/startup_parameters/68-RASMI-align-drift.npy')
 RASMI_align_drift_y = np.load('/nsls2/data2/hxn/legacy/users/startup_parameters/68-RASMI-align-drift_y.npy')
 RASMI_laser_ref = np.load('/nsls2/data2/hxn/legacy/users/startup_parameters/68-RASMI-laser-ref.npy')
+
+def get_laser_ref():
+    return ((caget('XF:03IDC-ES{Pico:1}POS_1')- caget('XF:03IDC-ES{Pico:1}POS_2'))/1e6*0.689 + \
+        caget('XF:03IDC-ES{Pico:1}POS_0')/1e6 + \
+        caget('XF:03IDC-ES{PT:Smpl-Ax:ssx}Mtr.TWV') + \
+        # Tweak value used as manual offset
+        -33 + 9.83) # Additional correction
+
 def get_tomo_ref(angle):
-    if angle < RASMI_laser_ref[0,0] or angle>RASMI_laser_ref[-1,0]:
-        return 0
+    if angle < RASMI_laser_ref[0,0]:
+        return RASMI_laser_ref[0,1]
+    if angle>RASMI_laser_ref[-1,0]:
+        return RASMI_laser_ref[-1,1]
     for i in range(len(RASMI_laser_ref)-1):
         if RASMI_laser_ref[i,0]<=angle and RASMI_laser_ref[i+1,0]>=angle:
             return (RASMI_laser_ref[i+1,1]*(angle-RASMI_laser_ref[i,0])+RASMI_laser_ref[i,1]*(RASMI_laser_ref[i+1,0]-angle))/(RASMI_laser_ref[i+1,0]-RASMI_laser_ref[i,0])
@@ -73,6 +83,11 @@ def get_tomo_drift(angle):
     for i in range(len(RASMI_align_drift)-1):
         if RASMI_align_drift[i,0]<=angle and RASMI_align_drift[i+1,0]>=angle:
             return (RASMI_align_drift[i+1,1]*(angle-RASMI_align_drift[i,0])+RASMI_align_drift[i,1]*(RASMI_align_drift[i+1,0]-angle))/(RASMI_align_drift[i+1,0]-RASMI_align_drift[i,0])
+
+def align_sample_tomo():
+    while np.abs(get_laser_ref() - get_tomo_ref(pt_tomo.th.position))>0.05:
+        yield from bps.movr(ptssx,get_laser_ref() - get_tomo_ref(pt_tomo.th.position))
+        yield from bps.sleep(1)
 
 def get_tomo_drift_y(angle):
     if angle < RASMI_align_drift_y[0,0] or angle>RASMI_align_drift_y[-1,0]:
@@ -120,6 +135,21 @@ def measure_proj_series(zlist,exp_time=3):
         yield from bps.abs_set(eiger_mobile.tif_capture,1)
         yield from bps.abs_set(eiger_mobile.cam.acquire,1)
         yield from bps.sleep(16)
+
+def rasmi_tomo(anglist,logfile):
+    yield from bps.mov(pt_tomo.th,anglist[0]-5)
+    # Always scan from minus angle towards positive direction
+
+    for angle in anglist:
+        yield from bps.mov(pt_tomo.th,angle)
+        yield from align_sample_tomo()
+        yield from pt_fly2dcontpd([eiger3],ptssx,0,6,100,ptssy,3,-3,100,0.005)
+        flog = open(logfile,'a')
+        flog.write('%d %.2f\n'%(db[-1].start['scan_id'],pt_tomo.th.user_readback.value))
+        flog.close()
+
+    caput("XF:03IDB-PPS{PSh}Cmd:Cls-Cmd", 1)
+
 def golden_tomo(samplename,interv,offset = 0):
      gdratio = (np.sqrt(5)-1)/2
      while True:

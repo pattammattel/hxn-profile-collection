@@ -52,7 +52,7 @@ class HXNEnergy():
 
 
 
-    def calcGap(self,E,harmonics = 5, offset = 0):
+    def calcGap(self,E,harmonics = 5, offset = 2):
         E1 = E/harmonics
         calc_gap =  np.polyval(self.ugap_coeffs, E1) + offset
         return (np.around(calc_gap,1))
@@ -735,7 +735,7 @@ def move_energy_with_sid(sid, move_zpz1 =False):
 
         yield from  find_beam_at_ssa2()
 
-        if sclr1_ch2.get()>100000:
+        if sclr2_ch2.get()>100000:
             yield from peak_ugap()
 
         yield from engage_mirror_feedback()
@@ -743,7 +743,7 @@ def move_energy_with_sid(sid, move_zpz1 =False):
         change_dets_energy(taget_e)
         print(f"energy set to {taget_e :.3f}")
 
-        if sclr1_ch2.get()<100000:
+        if sclr2_ch2.get()<100000:
             raise RuntimeError("Energy change seems to be failed; try manual alignment")
 
 

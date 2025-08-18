@@ -52,7 +52,6 @@ def get_xrf_data(h,elem ="Cr",mon ='sclr1_ch4'):
     try:
         xdata = np.array(df2[x_motor[0]])
     except:
-        from hxntools.scan_info import get_scan_positions
         xdata = np.array(get_scan_positions(h))
 
     if xdata.ndim>1:
@@ -132,7 +131,6 @@ def erf_fit_to_delete(sid, elem, mon='sclr1_ch4', linear_flag=True):
     try:
         xdata = np.array(df2[x_motor[0]])
     except:
-        from hxntools.scan_info import get_scan_positions
         xdata = get_scan_positions(h)
     ydata = xrf
     ydata[0] = ydata[1] #patch for drop point issue
@@ -421,8 +419,8 @@ def find_double_edge(xdata, ydata, size):
 def movr_zpz1(dz):
     yield from bps.movr(zp.zpz1, dz)
     #movr(zp.zpx, dz * 3.75)
-    yield from bps.movr(zp.zpy, (-0.003035)*dz) #follow the sign for corr factors
-    yield from bps.movr(zp.zpx, dz*(0.00111+0.00067-0.001))
+    yield from bps.movr(zp.zpy, (-0.002)*dz) #follow the sign for corr factors
+    yield from bps.movr(zp.zpx, dz*(0.0009795))
 
 def mov_zpz1(pos):
 
@@ -532,7 +530,7 @@ def zp_z_alignment(z_start, z_end, z_num, mot, start, end, num, acq_time,
         yield from fly1dpd(dets_fast_fs, mot, start, end, num, acq_time)
         yield from bps.sleep(2)
         edge_pos,fwhm=erf_fit(-1,elem,mon,linear_flag=linFlag)
-        yield from bps.mov(mot,edge_pos)
+        #3yield from bps.mov(mot,edge_pos)
         yield from bps.sleep(1)
         fit_size[i]= fwhm
         z_pos[i]=zp.zpz1.position
@@ -542,11 +540,11 @@ def zp_z_alignment(z_start, z_end, z_num, mot, start, end, num, acq_time,
         
     yield from movr_zpz1(-1*z_end)
     #fig, ax = plt.subplots()
-    plt.figure()
+    fig = plt.figure()
     plt.plot(z_pos,fit_size,'bo')
     #ax.set_xlabel('zpz1')
+    plt_update_figure()
     yield from bps.sleep(1)
-    plt.show()
 
 
 def zp_z_alignment2(z_start, z_end, z_num, mot, start, end, num, acq_time, 
@@ -567,11 +565,14 @@ def zp_z_alignment2(z_start, z_end, z_num, mot, start, end, num, acq_time,
         
     yield from mov_zpz1(init_sz)
     #fig, ax = plt.subplots()
-    plt.figure()
+    fig = plt.figure()
     plt.plot(z_pos,fit_size,'bo')
     #ax.set_xlabel('zpz1')
-    yield from bps.sleep(1)
+    fig.canvas.manager.show()
+    fig.canvas.draw()
+    fig.canvas.flush_events()
     plt.show()
+    yield from bps.sleep(1)
 
 
 def plot_z_focus_results(first_sid = -11, last_sid = -1, z_mtr ='zpz1',
@@ -666,6 +667,19 @@ def pos2angle(col,row):
     gamma = np.arccos(pos[2]/np.sqrt(pos_xy[0]**2+pos_xy[1]**2+pos_xy[2]**2))*180.0/np.pi
     return (np.round(gamma,1),np.round(delta,1),np.round(tth,1))
 
+def get_fluo_data(sid,elem):
+    h = db[sid]
+
+    channels = [1,2,3]
+    xrf = None
+    for i in channels:
+        fluo_data = np.array(list(h.data('Det%d_'%i+elem))).squeeze()
+        if xrf is None:
+            xrf = fluo_data.copy()
+        else:
+            xrf = xrf + fluo_data
+    return get_scan_positions(h),xrf
+
 
 def return_line_center(sid,elem='Cr',threshold=0.2, neg_flag=0):
     h = db[sid]
@@ -694,7 +708,6 @@ def return_line_center(sid,elem='Cr',threshold=0.2, neg_flag=0):
     try:
         x = np.array(df2[x_motor])
     except:
-        from hxntools.scan_info import get_scan_positions
         x = get_scan_positions(h)
     if neg_flag == 1:
         xrf = xrf * -1
@@ -774,39 +787,109 @@ def zp_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time,
     x = np.zeros(a_num+1)
     y = np.zeros(a_num+1)
     orig_th = zps.zpsth.position
+    fig,ax = plt.subplots(1)
+    plt_update_figure(fig)
+    ax.set_title('Alignment 1D scans')
     for i in range(a_num+1):
         x[i] = a_start + i*a_step
         yield from bps.mov(zps.zpsth, x[i])
         yield from bps.sleep(2)
-        if np.abs(x[i]) > 45.05:
+        if np.abs(x[i]) > 44.99:
             yield from fly1dpd(dets_fast_fs,zpssz,start,end,num,acq_time)
-            yield from bps.sleep(2)
+            yield from bps.sleep(0.5)
             tmp = return_line_center(-1, elem=elem,threshold=threshold,neg_flag=neg_flag)
+            points,fluo = get_fluo_data(-1,elem)
+            points*= np.sin(x[i]*np.pi/180.0)
             #tmp = return_tip_pos(-1, elem=elem)
             #tmp,fwhm = erf_fit(-1,elem = elem,linear_flag=False)
             y[i] = tmp*np.sin(x[i]*np.pi/180.0)
         else:
             yield from fly1dpd(dets_fast_fs,zpssx,start,end,num,acq_time)
+            yield from bps.sleep(0.5)
             tmp = return_line_center(-1,elem=elem,threshold=threshold,neg_flag=neg_flag )
+            points,fluo = get_fluo_data(-1,elem)
+            points*= np.cos(x[i]*np.pi/180.0)
             #tmp = return_tip_pos(-1, elem=elem)
             #tmp,fwhm = erf_fit(-1,elem = elem,linear_flag=False)
             y[i] = tmp*np.cos(x[i]*np.pi/180.0)
         print('y=',y[i])
+        ax.plot(points,fluo)
+        plt_update_figure(fig)
     y = -1*np.array(y)
     x = np.array(x)
     r0, dr, offset = rot_fit_2(x,y)
     yield from bps.mov(zps.zpsth, orig_th)
-    dx = -dr*np.sin(offset*np.pi/180)/1000.0
-    dz = -dr*np.cos(offset*np.pi/180)/1000.0
+    dx = -dr*np.sin(offset*np.pi/180)
+    dz = -dr*np.cos(offset*np.pi/180)
 
-    print(f'{dx = :.4f},   {dz = :.4f}')
+    print(f'{dx = :.4f} um,   {dz = :.4f} um')
+
+    print(f'MOVE relative: smarx = {dx :.1f} um, smarz = {dz :.1f} um')
+    print('Optional move relative: zpsx %.4f mm, zpsz %.4f mm'%(-r0/1000,-dz))
 
     if move_flag:
-        yield from bps.movr(zps.smarx, dx)
-        yield from bps.movr(zps.smarz, dz)
+        yield from bps.movr(zps.smarx, dx*1000)
+        yield from bps.movr(zps.smarz, dz*1000)
 
 
-    return dx,dz
+    # return dx,dz
+
+
+def zp_rot_scan(a_start, a_end, a_num, start, end, num, acq_time, 
+                     elem='Pt_L', threshold = 0.5, neg_flag = 0, move_flag=0):
+
+    """
+    <zp_rot_alignment(-30,30,5, -10, 10, 200, 0.03, 'Ni', 0.1)
+    """
+    a_step = (a_end - a_start)/a_num
+    x = np.zeros(a_num+1)
+    y = np.zeros(a_num+1)
+    orig_th = zps.zpsth.position
+    fig,ax = plt.subplots(1)
+    plt_update_figure(fig)
+    ax.set_title('Alignment 1D scans')
+    for i in range(a_num+1):
+        x[i] = a_start + i*a_step
+        yield from bps.mov(zps.zpsth, x[i])
+        yield from bps.sleep(2)
+        if np.abs(x[i]) > 44.99:
+            yield from fly1dpd(dets_fast,zpssz,start,end,num,acq_time)
+            yield from bps.sleep(0.5)
+            tmp = return_line_center(-1, elem=elem,threshold=threshold,neg_flag=neg_flag)
+            points,fluo = get_fluo_data(-1,elem)
+            points*= np.sin(x[i]*np.pi/180.0)
+            #tmp = return_tip_pos(-1, elem=elem)
+            #tmp,fwhm = erf_fit(-1,elem = elem,linear_flag=False)
+            y[i] = tmp*np.sin(x[i]*np.pi/180.0)
+        else:
+            yield from fly1dpd(dets_fast,zpssx,start,end,num,acq_time)
+            yield from bps.sleep(0.5)
+            tmp = return_line_center(-1,elem=elem,threshold=threshold,neg_flag=neg_flag )
+            points,fluo = get_fluo_data(-1,elem)
+            points*= np.cos(x[i]*np.pi/180.0)
+            #tmp = return_tip_pos(-1, elem=elem)
+            #tmp,fwhm = erf_fit(-1,elem = elem,linear_flag=False)
+            y[i] = tmp*np.cos(x[i]*np.pi/180.0)
+        print('y=',y[i])
+        ax.plot(points,fluo)
+        plt_update_figure(fig)
+    y = -1*np.array(y)
+    x = np.array(x)
+    r0, dr, offset = rot_fit_2(x,y)
+    yield from bps.mov(zps.zpsth, orig_th)
+    dx = -dr*np.sin(offset*np.pi/180)
+    dz = -dr*np.cos(offset*np.pi/180)
+
+    print(f'{dx = :.4f} um,   {dz = :.4f} um')
+
+    print(f'MOVE relative: smarx = {dx :.1f} um, smarz = {dz :.1f} um')
+    print('Optional move relative: zpsx %.4f mm, zpsz %.4f mm'%(-r0/1000,-dz))
+
+    if move_flag:
+        yield from bps.movr(zps.smarx, dx*1000)
+        yield from bps.movr(zps.smarz, dz*1000)
+
+
 
 
 def calc_rot_alignment(first_sid = -10, last_sid =-1, elem = "Cr"):
@@ -2803,8 +2886,8 @@ def recover_from_beamdump(peak_after = True):
 
 def move_zpz_with_energy(energy=9, move_zpz1 = False):
 
-    ref_energy = 10
-    ref_zpz1 = -14.592
+    ref_energy = 12
+    ref_zpz1 = -26.749
     per_ev_corr = 6.093
 
     calc_zpz1 = ref_zpz1 +((ref_energy-energy)* per_ev_corr)

@@ -16,6 +16,7 @@ import time as ttime
 from ophyd import Device, EpicsSignal, EpicsSignalRO
 from ophyd import Component as Cpt
 from hxntools.detectors.zebra import Zebra, EpicsSignalWithRBV
+from hxntools.handlers.rasmi2 import ZebraHDF5Handler,SISHDF5Handler
 from databroker.assets.handlers import HandlerBase
 from ophyd.areadetector.filestore_mixins import resource_factory
 
@@ -24,46 +25,6 @@ xs = None  # No Xspress3
 # use_sclr = False  # Set this False to run zebra without 'sclr'
 use_sclr = True
 
-
-class ZebraHDF5Handler(HandlerBase):
-    HANDLER_NAME = "ZEBRA_HDF51_FLY_STREAM_V1"
-
-    def __init__(self, resource_fn, *, frame_per_point):
-        self._frame_per_point = frame_per_point
-        self._handle = h5py.File(resource_fn, "r", libver='latest', swmr=True)
-
-    def __call__(self, *, column, point_number):
-        n_first = point_number * self._frame_per_point
-        n_last = n_first + self._frame_per_point
-        ds = self._handle[column]
-        ds.id.refresh()
-        return ds[n_first:n_last]
-
-
-db.reg.register_handler(ZebraHDF5Handler.HANDLER_NAME, ZebraHDF5Handler, overwrite=True)
-
-
-class SISHDF5Handler(HandlerBase):
-    HANDLER_NAME = "SIS_HDF51_FLY_STREAM_V1"
-
-    def __init__(self, resource_fn, *, frame_per_point):
-        self._frame_per_point = frame_per_point
-        self._handle = h5py.File(resource_fn, "r", libver='latest', swmr=True)
-
-    def __call__(self, *, column, point_number):
-        n_first = point_number * self._frame_per_point
-        n_last = n_first + self._frame_per_point
-        ds = self._handle[column]
-        ds.id.refresh()
-        return ds[n_first:n_last]
-
-    # def close(self):
-    #     self._handle.close()
-    #     self._handle = None
-    #     super().close()
-
-
-db.reg.register_handler(SISHDF5Handler.HANDLER_NAME, SISHDF5Handler, overwrite=True)
 
 
 

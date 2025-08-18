@@ -1,3 +1,5 @@
+import re 
+
 def export_scan_header(scan_id,motorx,rangex,numx,motory,rangey,numy,detectors):
     with open('/data/users/startup_parameters/scan_header.txt','w') as f:
         f.write('[scan]\n')
@@ -181,7 +183,7 @@ class PandaLivePlot():
         self.ncol = int(np.ceil(self.ntotal/self.nrow))
         self.scan_id = 0
 
-    def setup_plot(self,scan_input,det):
+    def setup_plot(self,scan_input,det,sclr=None):
         self.xsp = det
         self.fig.clear()
         self.axs = []
@@ -195,8 +197,13 @@ class PandaLivePlot():
 
         for r in self.xsp.enabled_rois:
             for i in range(self.ntotal):
-                if r.name.endswith(live_plot_elems[i]) and not r.name in [roi.name for roi in self.elems[i]]:
-                    self.elems[i].append(r)
+                if live_plot_elems[i].startswith('sclr'):
+                    match = re.search(r'sclr(\d+)_ch(\d+)',live_plot_elems[i])
+                    ch_num = int(match.group(2))
+                    self.elems[i].append(sclr.mca_by_index[ch_num])
+                else:
+                    if r.name.endswith(live_plot_elems[i]) and not r.name in [roi.name for roi in self.elems[i]]:
+                        self.elems[i].append(r)
 
         self.scan_input = scan_input.copy()
         if len(self.scan_input)<2:
@@ -213,14 +220,21 @@ class PandaLivePlot():
         #Live plot
         for i in range(self.ntotal):
             fluo_data = np.zeros(self.total_points)
+            set_nan = False
             for roi in self.elems[i]:
-                fluo_tmp = roi.settings.array_data.get()
+                if roi.name.startswith('sclr'):
+                    fluo_tmp = roi.spectrum.get()
+                    set_nan = True
+                else:
+                    fluo_tmp = roi.settings.array_data.get()
                 if len(fluo_tmp) > self.total_points:
                     return
                 fluo_data[:len(fluo_tmp)] += fluo_tmp
             if finished:
                 fluo_data[len(fluo_tmp):] = fluo_data[len(fluo_tmp)-1]
                 self.do_plot = False
+            if set_nan:
+                fluo_data[fluo_data==0] = np.nan
             #    if hasattr(roi,'settings'):
             #        fluo_data = roi.settings.array_data.get()
             #    else:

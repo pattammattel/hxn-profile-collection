@@ -121,18 +121,9 @@ def align_scan(mtr,start,end,num,exp,elem_, align_with="line_center",
     threshold --> threshold for line centering
 
     """
-    fly_to_coarse = {"zpssx":"smarx","zpssy":"smary","zpssz":"smarz",
-                     "dssx":"dsx","dssy":"dsy","dssz":"dsz"}
-    zp_flag = False
-    dummy_mtr = 'zpssx'
-    
-    if mtr.name.startswith('zp'):
-        zp_flag = True
-        dummy_mtr = 'dssx'
-    
-    uni_conv = 1
-    if zp_flag:
-        uni_conv = 1000
+    fly_to_coarse = {"zpssx":smarx,"zpssy":smary,"zpssz":smarz,
+                     "dssx":dsx,"dssy":dsy,"dssz":dsz}
+
 
     if reset_piezos_to_zero:
             yield from bps.mov(mtr,0,wait=True)
@@ -157,12 +148,12 @@ def align_scan(mtr,start,end,num,exp,elem_, align_with="line_center",
                         exp
                         )
     if align_with == "line_center":
-        yield from bps.sleep(3)
+        yield from bps.sleep(1)
         xc = return_line_center(-1,elem_,threshold, neg_flag = neg_flag)
         xc = xc+offset
         
     elif align_with == "edge":
-        yield from bps.sleep(3)
+        yield from bps.sleep(1)
         xc,_ = erf_fit(-1,elem_,linear_flag=False)
         if abs(xc) - abs(initial_position) > align_movement_limit:
             xc = mtr.position + offset
@@ -173,11 +164,16 @@ def align_scan(mtr,start,end,num,exp,elem_, align_with="line_center",
         xc = mtr.position
 
     if move_coarse:
-        yield from bps.movr(eval(fly_to_coarse[mtr.name]),xc/uni_conv)
+        coarse_stage = fly_to_coarse[mtr.name]
+        print(f"move {coarse_stage.name} relative {xc}")
+        yield from bps.movr(coarse_stage,xc)
+        
+        # yield from bps.movr(eval(fly_to_coarse[mtr.name]),xc/uni_conv)
         #yield from piezos_to_zero(zp_flag = zp_flag)
 
     else:
         yield from bps.sleep(1)
+        print(f"move {mtr.name} to {xc}")
         yield from bps.mov(mtr,xc)
     
     return xc

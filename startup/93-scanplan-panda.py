@@ -136,48 +136,48 @@ panda1 = PandA_Ophyd1("XF03IDC-ES-PANDA-1:", name="panda1")
 panda1.pulse2.width.put_complete = True
 
 
-class ExportSISDataPanda:
-    def __init__(self):
-        self._fp = None
-        self._filepath = None
+# class ExportSISDataPanda:
+#     def __init__(self):
+#         self._fp = None
+#         self._filepath = None
 
-    def open(self, filepath, mca_names, ion, panda):
-        self.close()
-        self._filepath = filepath
-        self._fp = h5py.File(filepath, "w", libver="latest")
+#     def open(self, filepath, mca_names, ion, panda):
+#         self.close()
+#         self._filepath = filepath
+#         self._fp = h5py.File(filepath, "w", libver="latest")
 
-    pulse1 = Cpt(PULSE, "PULSE1:")
-    pulse2 = Cpt(PULSE, "PULSE2:")
-    pulse3 = Cpt(PULSE, "PULSE3:")
-    pulse4 = Cpt(PULSE, "PULSE4:")
-    positions = Cpt(POSITIONS, "POSITIONS:")
-    bits = Cpt(BITS, "BITS:")
-
-
-panda1 = PandA_Ophyd1("XF03IDC-ES-PANDA-1:", name="panda1")
-panda1.pulse2.width.put_complete = True
+#     pulse1 = Cpt(PULSE, "PULSE1:")
+#     pulse2 = Cpt(PULSE, "PULSE2:")
+#     pulse3 = Cpt(PULSE, "PULSE3:")
+#     pulse4 = Cpt(PULSE, "PULSE4:")
+#     positions = Cpt(POSITIONS, "POSITIONS:")
+#     bits = Cpt(BITS, "BITS:")
 
 
-class ExportSISDataPanda:
-    def __init__(self):
-        self._fp = None
-        self._filepath = None
-
-    def open(self, filepath, mca_names, ion, panda):
-        self.close()
-        self._filepath = filepath
-        self._fp = h5py.File(filepath, "w", libver="latest")
-
-    pulse1 = Cpt(PULSE, "PULSE1:")
-    pulse2 = Cpt(PULSE, "PULSE2:")
-    pulse3 = Cpt(PULSE, "PULSE3:")
-    pulse4 = Cpt(PULSE, "PULSE4:")
-    positions = Cpt(POSITIONS, "POSITIONS:")
-    bits = Cpt(BITS, "BITS:")
+# panda1 = PandA_Ophyd1("XF03IDC-ES-PANDA-1:", name="panda1")
+# panda1.pulse2.width.put_complete = True
 
 
-panda1 = PandA_Ophyd1("XF03IDC-ES-PANDA-1:", name="panda1")
-panda1.pulse2.width.put_complete = True
+# class ExportSISDataPanda:
+#     def __init__(self):
+#         self._fp = None
+#         self._filepath = None
+
+#     def open(self, filepath, mca_names, ion, panda):
+#         self.close()
+#         self._filepath = filepath
+#         self._fp = h5py.File(filepath, "w", libver="latest")
+
+#     pulse1 = Cpt(PULSE, "PULSE1:")
+#     pulse2 = Cpt(PULSE, "PULSE2:")
+#     pulse3 = Cpt(PULSE, "PULSE3:")
+#     pulse4 = Cpt(PULSE, "PULSE4:")
+#     positions = Cpt(POSITIONS, "POSITIONS:")
+#     bits = Cpt(BITS, "BITS:")
+
+
+# panda1 = PandA_Ophyd1("XF03IDC-ES-PANDA-1:", name="panda1")
+# panda1.pulse2.width.put_complete = True
 
 
 class ExportSISDataPanda:
@@ -554,7 +554,7 @@ class HXNFlyerPanda(Device):
                 self._last_bulk["timestamps"].update(
                     {k: v["timestamp"] for k, v in reading.items()}
                 )
-            if d.name == 'eiger2' or d.name == 'eiger_mobile':
+            if d.name.startswith('eiger'):
                 reading = d.read()
                 self._last_bulk["data"].update(
                     {k: v["value"] for k, v in reading.items()}
@@ -613,7 +613,7 @@ class HXNFlyerPanda(Device):
         for d in self._dets:
             if d.name == 'merlin1' or d.name == 'merlin2':
                 desc.update(d.describe())
-            if d.name == 'eiger2' or d.name == 'eiger_mobile':
+            if d.name.startswith('eiger'):
                 desc.update(d.describe())
             if d.name == 'xspress3':
                 desc.update([(k, v) for k,v in d.describe().items() if k.startswith('xspress3')])
@@ -653,22 +653,6 @@ class HXNFlyerPanda(Device):
 
 panda_flyer = HXNFlyerPanda(panda1,[],sclr1,name="PandaFlyer")
 panda_flyer_fip = HXNFlyerPanda(panda1,[],sclr1,name="PandaFlyer_FIP")
-
-class PandAHandlerHDF5(HandlerBase):
-    """The handler to read HDF5 files produced by PandABox."""
-
-    specs = {"PANDA"}
-
-    def __init__(self, filename):
-        self._name = filename
-
-    def __call__(self, field):
-        with h5py.File(self._name, "r") as f:
-            entry = f[f"/{field}"]
-            return entry[:]
-
-
-db.reg.register_handler("PANDA", PandAHandlerHDF5, overwrite=True)
 
 def flyscan_pd(detectors, start_signal, total_points, dwell, *,
                       panda_flyer,
@@ -733,7 +717,7 @@ def flyscan_pd(detectors, start_signal, total_points, dwell, *,
         t_detset = tic()
 
     # Set up the detectors
-    for det_name in ("merlin1", "merlin2", "eiger2", "eiger_mobile"):
+    for det_name in ("merlin1", "merlin2", "eiger2", "eiger3", "eiger_mobile"):
         if det_name in dets_by_name:
             dpc = dets_by_name[det_name]
             acquire_time = dwell - dead_time
@@ -881,7 +865,7 @@ def flyscan_pd(detectors, start_signal, total_points, dwell, *,
     #     livepopup = []
 
     for d in panda_flyer.detectors:
-        if d.name == 'eiger2' or d.name == 'eiger_mobile':
+        if d.name.startswith('eiger'):
             yield from bps.mov(d.fly_next, True)
             yield from bps.mov(d.internal_trigger, False)
 
@@ -903,7 +887,7 @@ def flyscan_pd(detectors, start_signal, total_points, dwell, *,
 
         # TODO move this to stage sigs
         for d in panda_flyer.detectors:
-            if d.name == "eiger2" or d.name == "eiger_mobile":
+            if d.name.startswith('eiger'):
                 yield from bps.mov(d.total_points, total_points)
 
         print(f"Scanning fly")
@@ -1306,7 +1290,7 @@ def fly2dpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_start2, sca
             # yield from bps.sleep(2)
             for d in dets:
                 if d.name == 'xspress3' or d.name == 'xspress3_det2':
-                    panda_live_plot.setup_plot(scan_input,d)
+                    panda_live_plot.setup_plot(scan_input,d,panda_flyer.sclr)
             
             scan_header = [motor1,np.abs(range1),num1,motor2,np.abs(range2),num2]
 
@@ -1523,7 +1507,7 @@ def fly2dpd_repeat(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_star
             # yield from bps.sleep(2)
             for d in dets:
                 if d.name == 'xspress3' or d.name == 'xspress3_det2':
-                    panda_live_plot.setup_plot(scan_input,d)
+                    panda_live_plot.setup_plot(scan_input,d,panda_flyer.sclr)
 
             yield from flyscan_pd(dets, '&6begin41r', num1*num2*repeat, exposure_time, dead_time = dead_time, md=md, scan_dim = [num1,num2*repeat], position_supersample = position_supersample, merlin_cont_mode=merlin_cont_mode, **kwargs)
 
@@ -1717,7 +1701,7 @@ def fly1dpd(dets, motor1, scan_start1, scan_end1, num1, exposure_time, pos_retur
             # yield from bps.sleep(2)
             for d in dets:
                 if d.name == 'xspress3' or d.name == 'xspress3_det2':
-                    panda_live_plot.setup_plot(scan_input,d)
+                    panda_live_plot.setup_plot(scan_input,d,panda_flyer.sclr)
             yield from flyscan_pd(dets, '&6begin41r', num1*num2, exposure_time, dead_time = dead_time, md=md, scan_dim = [num1,num2], position_supersample = position_supersample, merlin_cont_mode=merlin_cont_mode, **kwargs)
 
 
@@ -2034,7 +2018,7 @@ def timescanpd(dets, num, exposure_time, pos_return = True, apply_tomo_drift = F
             # yield from bps.sleep(2)
             for d in dets:
                 if d.name == 'xspress3' or d.name == 'xspress3_det2':
-                    panda_live_plot.setup_plot(scan_input,d)
+                    panda_live_plot.setup_plot(scan_input,d,panda_flyer.sclr)
             yield from flyscan_pd(dets, '&6begin41r', num, exposure_time, dead_time = dead_time, md=md, scan_dim = [num,1], position_supersample = position_supersample, merlin_cont_mode=merlin_cont_mode, wait_for_start_input = wait_for_start_input, **kwargs)
 
 

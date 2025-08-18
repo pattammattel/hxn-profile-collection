@@ -292,11 +292,12 @@ def zp_tomo_scan_to_loop(angle, tomo_params, ic_init,tracking_file = None,add_lo
             try:
                 insert_xrf_map_to_pdf(-1,
                                      elems_to_pdf,
-                                     title =  ["zpsth", "energy"], 
+                                     title_ =  ["zpsth", "energy"], 
                                      note = tomo_params["scan_label"])
                 plt.close()
                 
             except:
+                traceback.print_exc()
                 pass
 
         if tracking_file is not None:

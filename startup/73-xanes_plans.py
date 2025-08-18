@@ -17,7 +17,7 @@ import pandas as pd
 import time,json,math
 from datetime import datetime
 import scipy.constants as consts
-
+import traceback
 
 
 #Paramer list from previous runs in the order of atomic number of the element
@@ -225,7 +225,7 @@ def alignment_scan(mtr, start,end,num,exp,elem_, align_with="line_center",
     
     if move_coarse:
         yield from piezos_to_zero()
-        yield from bps.movr(eval(fly_to_coarse[mtr.name]),xc/1000)
+        yield from bps.movr(eval(fly_to_coarse[mtr.name]),xc)
         
     else:
         yield from bps.mov(mtr,xc)
@@ -665,7 +665,7 @@ def run_zp_xanes(path_to_parameter_file, do_confirm  =True, add_low_res_scan = F
             else:
             
                 if alignY["do_align"]:
-                    yield from alignment_scan(  y_motor, 
+                    yield from align_scan(  y_motor, 
                                                 alignY["start"],
                                                 alignY["end"],
                                                 alignY["num"],
@@ -678,7 +678,7 @@ def run_zp_xanes(path_to_parameter_file, do_confirm  =True, add_low_res_scan = F
                                                 ) 
                 
                 if alignX["do_align"]:
-                    yield from alignment_scan(  x_motor, 
+                    yield from align_scan(  x_motor, 
                                                 alignX["start"],
                                                 alignX["end"],
                                                 alignX["num"],
@@ -705,7 +705,7 @@ def run_zp_xanes(path_to_parameter_file, do_confirm  =True, add_low_res_scan = F
                             image_scan["x_num"],
                             y_motor,
                             image_scan["y_start"],
-                            image_scan["y_end"],
+                            image_scan["y_end"],    
                             image_scan["y_num"],
                             image_scan["exposure"]
                             )
@@ -749,9 +749,11 @@ def run_zp_xanes(path_to_parameter_file, do_confirm  =True, add_low_res_scan = F
                     insert_xrf_map_to_pdf(-1,
                                           scan_params["pdf_elems"],
                                           title_=['energy', 'zpsth'],
-                                          note =scan_name)# plot data and add to pdf
+                                          note =scan_name,
+                                          norm = None)# plot data and add to pdf
                     plt.close()
                 except:
+                    traceback.print_exc()
                     pass
             
             # save the DF in the loop so quitting a scan won't affect
@@ -992,7 +994,7 @@ def run_mll_xanes(path_to_parameter_file,do_confirm =True):
                 
 
             if alignY["do_align"]:
-                yield from alignment_scan(  y_motor, 
+                yield from align_scan(  y_motor, 
                                             alignY["start"],
                                             alignY["end"],
                                             alignY["num"],
@@ -1004,7 +1006,7 @@ def run_mll_xanes(path_to_parameter_file,do_confirm =True):
                                             ) 
                 
             if alignX["do_align"]:
-                yield from alignment_scan(  x_motor, 
+                yield from align_scan(  x_motor, 
                                             alignX["start"],
                                             alignX["end"],
                                             alignX["num"],

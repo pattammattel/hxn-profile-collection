@@ -344,7 +344,8 @@ def run_zp_spectro_tomo_scan(path_to_json):
     #record if peak beam happed before the scan   
     e_list['Peak Flux'] = False 
     
-    print(e_list.head())
+    # print(e_list.head())
+    print(e_list)
     yield from bps.sleep(1)#time to quit if anything wrong
     
     #get intal ic1 value
@@ -462,7 +463,7 @@ def run_zp_spectro_tomo_scan(path_to_json):
                     mtr = zpssz
                 
                 if alignX["do_align"]:
-                    yield from alignment_scan(  mtr, 
+                    yield from align_scan(  mtr, 
                                                 alignX["start"],
                                                 alignX["end"],
                                                 alignX["num"],
@@ -475,7 +476,7 @@ def run_zp_spectro_tomo_scan(path_to_json):
                 #plt.close()              
 
                 if alignY["do_align"]:
-                    yield from alignment_scan(  zpssy, 
+                    yield from align_scan(  zpssy, 
                                                 alignY["start"],
                                                 alignY["end"],
                                                 alignY["num"],

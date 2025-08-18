@@ -1,6 +1,9 @@
-if not USE_RASMI \
-    or True: # Merlin not used
-    # print(f"RASMI Merlin not used, skipping {__file__!r} ...")
+if True: # Merlin not used
+    import sys
+    sys.exit()
+
+if not USE_RASMI: 
+    print(f"RASMI not used, skipping {__file__!r} ...")
     import sys
     sys.exit()
 

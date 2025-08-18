@@ -181,7 +181,7 @@ def rot_fit_2(x, y):
     plt.legend(loc='best')
     #plt.title(f"{popt[0] :.3f} + {popt[1] :.3f}*sin((x+{popt[2] :.3f})*{popt[3]:.3f})")
     plt.title(f"{popt[0] :.3f} + {popt[1] :.3f}*sin((x+{popt[2] :.3f}))")
-    plt.show()
+    plt_update_figure()
     return popt[0], popt[1], popt[2]
 
 def find_mass_center(array):
@@ -2612,7 +2612,6 @@ def return_center_of_mass(scan_id = -1, elem = 'Cr',threshold=0.5):
         x = np.array(df2[motors[0]])
         y = np.array(df2[motors[1]])
     except:
-        from hxntools.scan_info import get_scan_positions
         x,y = get_scan_positions(h)
     #I0 = np.asfarray(df2.sclr1_ch4)
     I0 = np.array(list(h.data('sclr1_ch4'))).squeeze()
@@ -2663,7 +2662,6 @@ def return_center_of_mass_blurr(scan_id = -1, elem = 'Cr',blurr_level = 10,bitfl
         x = np.array(df2[motors[0]])
         y = np.array(df2[motors[1]])
     except:
-        from hxntools.scan_info import get_scan_positions
         x,y = get_scan_positions(h)
     #I0 = np.asfarray(df2.sclr1_ch4)
     I0 = np.array(list(h.data('sclr1_ch4'))).squeeze()
@@ -3648,7 +3646,7 @@ def insert_xrf_map_to_pdf(scan_id = -1, elements = ["Cr", "Fe"],
     
     for n, elem in enumerate(elements):
         print(f"{elem = }")
-        spectrum_ = get_xrf_array(scan_id, elem)
+        spectrum_ = get_xrf_array(scan_id, elem,norm=norm)
         ax = fig.add_subplot(Rows,cols,Position[n])
         if len(mots) == 2:
             im = ax.imshow(spectrum_, 
@@ -4259,6 +4257,115 @@ def calc_exposure_time(snum):
     print('Scan %d actual exposure time %.5f ms'%(snum,time_exp*1000))
     return time_exp
 
+      
+def export_diff_data_as_h5(sid_list, 
+                           det="eiger2_image", 
+                           wd = '.', compression = 'gzip'):
+    # load diffraction data of a list of scans through databroker, with data being stacked at the first axis
+    # roi[row_start,col_start,row_size,col_size]
+    # mask has to be the same size of the image data, which corresponds to the last two axes
+    
+    data_type = 'float32'
+
+    if sid_list.isinstance(int):
+        sid_list = list(sid_list)
+
+    if sid_list.isinstance(float):
+        sid_list = list(sid_list)
+  
+    num_scans = np.size(sid_list)
+    data_name = '/entry/instrument/detector/data'
+    for i in tqdm(range(num_scans),desc="Progress"):
+        sid = int(sid_list[i])
+        print(f"{sid = }")
+
+        #skip 1d
+
+        hdr = db[int(sid)]
+        start_doc = hdr["start"]
+        sid = start_doc["scan_id"]
+        
+        if 'num1' and 'num2' in start_doc:
+            dim1,dim2 = start_doc['num1'],start_doc['num2']
+        elif 'shape' in start_doc:
+            dim1,dim2 = start_doc.shape
+        try:
+            xy_scan_positions = list(np.array(df[mots[0]]),np.array(df[mots[1]]))
+        except:
+            xy_scan_positions = list(get_scan_positions(hdr))
+
+        scan_table = get_scan_metadata(int(sid))
+        if not start_doc["plan_type"] in ("FlyPlan1D",):
+
+            file_name = get_path(sid,det)
+            num_subscan = len(file_name)
+            
+            if num_subscan == 1:
+                f = h5py.File(file_name[0],'r') 
+                data = np.asarray(f[data_name],dtype=data_type)
+            else:
+                sorted_files = sort_files_by_creation_time(file_name)
+                ind = 0
+                for name in sorted_files:
+                    f = h5py.File(name,'r')
+                    if ind == 0:
+                        data = np.asarray(f[data_name],dtype=data_type)
+                    else:   
+                        data = np.concatenate([data,np.asarray(f[data_name],dtype=data_type)],0)
+                    ind = ind + 1
+                #data = list(db[sid].data(det))
+                #data = np.asarray(np.squeeze(data),dtype=data_type)
+            _, roi1,roi2 = np.shape(data)
+
+            mon_array = np.array(list(hdr.data(str('sclr1_ch4')))).squeeze()
+
+            data = np.flip(data[:,:,:],axis = 1)
+
+                
+            print(f"data size = {data.size/1_073_741_824 :.2f} GB")
+
+            #save_folder =  os.path.join(wd,f"{sid}_diff_data")   
+
+            #if not os.path.exists(save_folder):
+                #os.makedirs(save_folder)
+
+            if wd:
+                save_folder = wd
+                
+            saved_as = os.path.join(save_folder,f"scan_{sid}_{det}")
+
+            f.close()
+
+            
+            with h5py.File(saved_as+'.h5','w') as f:
+
+                
+                data_group = f.create_group(f'{det}_raw_data')
+                data_group = f.create_group(f'/diff_data/{det}/')
+                data_group.create_dataset('raw_data',
+                                           data=data.reshape(dim1,dim2,roi1,roi2), 
+                                           compression = compression )
+                
+                #dset = f.create_dataset('/entry/instrument/detector/data', data=data)
+                
+                
+
+                data_group.create_dataset('Io',
+                                           data=mon_array.reshape(dim1,dim2),
+                                            )
+
+                data_group = f.create_group(f'/diff_data/scan/')
+                data_group.create_dataset('scan_positions',
+                            data=xy_scan_positions)
+                scan_table.to_csv(saved_as+'_meta_data.csv')
+
+                # xrf_group = f.create_group('xrf_roi_data')
+                # names, xrf_2d = get_xrf_data(sid)
+                # xrf_group.create_dataset('xrf_roi_array', data = xrf_2d)
+                # xrf_group.create_dataset('xrf_elem_names', data = names)
+
+            f.close()
+            print(f"{saved_as =}")
 
 
     '''

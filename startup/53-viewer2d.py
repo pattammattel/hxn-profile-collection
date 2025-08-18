@@ -17,6 +17,13 @@ from scipy.interpolate import interp1d, interp2d
 from hxnfly.callbacks.liveplot import add_toolbar_button
 from hxntools.scan_info import get_scan_positions
 
+def plt_update_figure(fig=None):
+    if fig is None:
+        fig = plt.gcf()
+    
+    fig.canvas.manager.show()
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
 def plot3D(data,axis=0,index_init=None, *args, **kwargs):
     fig, ax = plt.subplots()
@@ -191,7 +198,6 @@ def plot(scan_id, elem='Pt', norm=None,
     if scanned_axis == 'ugap':
         scanned_axis = 'ugap_readback'
     
-    from hxntools.scan_info import get_scan_positions
     x = get_scan_positions(h)
 
     if e_flag:
@@ -387,28 +393,28 @@ def _load_scan(scan_id, fill_events=False):
     return scan_id, df
 
 
-def get_flyscan_dimensions(hdr):
-    if 'dimensions' in hdr:
-        return hdr['dimensions']
+def get_flyscan_dimensions(start_doc):
+    if 'dimensions' in start_doc:
+        return start_doc['dimensions']
     else:
-        return hdr['shape']
+        return start_doc['shape']
 
 
-def fly2d_grid(hdr, x_data=None, y_data=None, plot=False):
+def fly2d_grid(start_doc, x_data=None, y_data=None, plot=False):
     '''Get ideal gridded points for a 2D flyscan'''
     try:
-        nx, ny = get_flyscan_dimensions(hdr)
+        nx, ny = get_flyscan_dimensions(start_doc)
     except ValueError:
         raise ValueError('Not a 2D flyscan')
 
-    rangex, rangey = hdr['scan_range']
+    rangex, rangey = start_doc['scan_range']
     width = rangex[1] - rangex[0]
     height = rangey[1] - rangey[0]
 
-    if 'scan_starts' in hdr:
-        start_x, start_y = hdr['scan_starts'][0]
+    if 'scan_starts' in start_doc:
+        start_x, start_y = start_doc['scan_starts'][0]
     else:
-        macros = eval(hdr['subscan_0']['macros'], dict(array=np.array))
+        macros = eval(start_doc['subscan_0']['macros'], dict(array=np.array))
         start_x, start_y = macros['scan_starts']
 
     dx = width / nx
@@ -454,10 +460,10 @@ def interp1d_scan(hdr, x_data, y_data, spectrum, kind='linear',
     return spectrum2
 
 
-def fly2d_reshape(hdr, spectrum, verbose=True):
+def fly2d_reshape(start_doc, spectrum, verbose=True):
     '''Reshape a 1D array to match the shape of a 2D flyscan'''
     try:
-        nx, ny = get_flyscan_dimensions(hdr)
+        nx, ny = get_flyscan_dimensions(start_doc)
     except ValueError:
         raise ValueError('Not a 2D flyscan')
 
@@ -468,7 +474,7 @@ def fly2d_reshape(hdr, spectrum, verbose=True):
             print('\tUnable to reshape data to (%d, %d) (%s: %s)'
                   '' % (nx, ny, ex.__class__.__name__, ex))
     else:
-        fly_type = hdr['fly_type']
+        fly_type = start_doc['fly_type']
         if fly_type in ('pyramid', ):
             # Pyramid scans' odd rows are flipped:
             if verbose:
@@ -568,7 +574,7 @@ def plot2dfly(scan_id, elem='Pt', norm=None, *, x=None, y=None, clim=None,
         spectrum = spectrum/(monitor)
 
 
-    nx, ny = get_flyscan_dimensions(md)
+    nx, ny = get_flyscan_dimensions(hdr.start)
     total_points = nx * ny
 
     if clim is None:
@@ -667,7 +673,7 @@ def plot2dfly(scan_id, elem='Pt', norm=None, *, x=None, y=None, clim=None,
 def export_diff(sid_start, sid_end, interval=1,
            export_folder='/data/users/2023Q1/Cao_2023Q1/diff_data_all',det='merlin1',
            fields_excluded=['xspress3_ch1', 'xspress3_ch2','xspress3_ch3', 'merlin1']):
-
+    print('saving {}'.format(det))
     for sid in range(sid_start,sid_end+1,interval):
         try:
             #sid, df = _load_scan(sid, fill_events=False)
