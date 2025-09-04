@@ -11,6 +11,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Suppress size and datatype mismatch user warnings.
+import warnings
+warnings.filterwarnings("ignore",module="bluesky.callbacks.tiled_writer")
+
 def patch_descriptor(doc):
     # Issue #1: data keys for 'scaler_alive', 'sclr1_ch2' .. 'sclr1_ch8' have incorrect "dtype": "array"  and "shape": [1].
     #   Replace the values with "dtype": "number" and "shape": []. Also set "dtype_str": "<i8" for "sclr1_ch.." to get rid of warnings.
@@ -181,7 +185,7 @@ tw = TiledWriter(client = tiled_writing_client,
                  patches = {"descriptor": patch_descriptor,
                            "datum": patch_datum,
                            "resource": patch_resource})
-# tw = BufferingWrapper(tw)      # Thread-safe wrapper for TiledWriter
+tw = BufferingWrapper(tw)      # Thread-safe wrapper for TiledWriter
 
 def cache_retriever(name, doc):
     """Replay all received datum documents from the cache when the scan finishes. Wraps TiledWriter."""
