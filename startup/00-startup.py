@@ -10,6 +10,7 @@ import pandas as pd
 from collections import deque
 from datetime import datetime, timedelta, tzinfo
 from pathlib import Path
+import threading
 
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
@@ -105,6 +106,43 @@ datum_counts = {}
 
 from hxntools.CompositeBroker import sanitize_np,apply_to_dict_recursively
 
+
+# Define a thread-safe cache for datum and resource documents
+class ThreadSafeDocumentCache:
+    def __init__(self):
+        self._resource_deque = deque()
+        self._datum_deque = deque()
+        self._resource_lock = threading.Lock()
+        self._datum_lock = threading.Lock()
+
+    def append(self, name, doc):
+        if name == "resource":
+            with self._resource_lock:
+                self._resource_deque.append(doc)
+        elif name == "datum":
+            with self._datum_lock:
+                self._datum_deque.append(doc)
+        else:
+            raise ValueError(f"ThredSafeDocumentCache does not support document type: {name}")
+
+    def popleft(self):
+        # Try to emmit a Resource first; if empty -- emmit Datum
+        with self._resource_lock:
+            if self._resource_deque:
+                return "resource", self._resource_deque.popleft()
+
+        with self._datum_lock:
+            if self._datum_deque:
+                return "datum", self._datum_deque.popleft()
+
+        return None
+
+    def size(self):
+        with self._resource_lock, self._datum_lock:
+            return len(self._resource_deque) + len(self._datum_deque)
+
+tiled_document_cache = ThreadSafeDocumentCache()
+
 class CompositeRegistry(Registry):
     '''Composite registry.'''
 
@@ -145,6 +183,11 @@ class CompositeRegistry(Registry):
         resource_object['id'] = resource_object['uid']
         resource_object.pop('_id', None)
         ret = resource_object['uid']
+
+        # Insert the Resource document into the cache to be written to Tiled. we need to wait until the document is
+        # fully constructed, because the TiledWriter thread might acces it before `uid` is set.
+        # Make a copy and remove the `id` key as it violates the document schema.
+        tiled_document_cache.append("resource", {k:v for k, v in resource_object.items() if k != 'id'})
 
         return ret
 
@@ -193,6 +236,8 @@ class CompositeRegistry(Registry):
         # ignore the second attempt to insert.
         try:
             kafka_publisher('datum', datum)
+            tiled_document_cache.append("datum", {k:v for k, v in datum.items() if k != '_id'})
+
             #col.insert_one(datum)
         except duplicate_exc:
             if ignore_duplicate_error:
@@ -252,6 +297,7 @@ class CompositeRegistry(Registry):
             apply_to_dict_recursively(dm, sanitize_np)
             to_write.append(pymongo.InsertOne(dm))
             d_uids.append(dm['datum_id'])
+            tiled_document_cache.append("datum", {k:v for k, v in dm.items() if k != '_id'})
 
         col.bulk_write(to_write, ordered=False)
 
@@ -343,6 +389,7 @@ def flush_on_stop_doc(name, doc):
 
 # This is needed to prevent the local buffer from filling.
 RE.subscribe(flush_on_stop_doc, 'stop')
+
 
 # Pass on only start/stop documents to a few subscriptions
 for _event in ('start', 'stop'):
