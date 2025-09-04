@@ -283,6 +283,8 @@ from hxntools.CompositeBroker import HXN_compose_db
 ### Databroker ###
 db = HXN_compose_db(reg=CompositeRegistry)
 
+from hxntools.CompositeBroker import get_path
+
 
 # do the rest of the standard configuration
 from IPython import get_ipython

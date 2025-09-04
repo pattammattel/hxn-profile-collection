@@ -713,18 +713,21 @@ def export_diff(sid_start, sid_end, interval=1,
 
 
 
-def get_path(scan_id, key_name='merlin1', db=db):
-    """Return file path with given scan id and keyname.
-    """
-    import os
-    h = db[scan_id]
-    e = list(db.get_events(h, fields=[key_name]))
-    id_list = [v.data[key_name] for v in e]
-    rootpath = db.reg.resource_given_datum_id(id_list[0])['root']
-    flist = [db.reg.resource_given_datum_id(idv)['resource_path'] for idv in id_list]
-    flist = set(flist)
-    fpath = [os.path.join(rootpath, file_path) for file_path in flist]
-    return fpath
+# in 00-startup.py:
+# from hxntools.CompositeBroker import get_path
+
+# def get_path(scan_id, key_name='merlin1', db=db):
+#     """Return file path with given scan id and keyname.
+#     """
+#     import os
+#     h = db[scan_id]
+#     e = list(db.get_events(h, fields=[key_name]))
+#     id_list = [v.data[key_name] for v in e]
+#     rootpath = db.reg.resource_given_datum_id(id_list[0])['root']
+#     flist = [db.reg.resource_given_datum_id(idv)['resource_path'] for idv in id_list]
+#     flist = set(flist)
+#     fpath = [os.path.join(rootpath, file_path) for file_path in flist]
+#     return fpath
 
 
 
