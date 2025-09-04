@@ -3504,20 +3504,20 @@ def zp_theta_scan_center_angle(angle_start,angle_end,angle_step_size,x1,x2,x_num
 
 import epics
 def zp_rock(angle_start,angle_end,x_step, num):
-    p_v_ry_0 = p_v_ry.position
+    # p_v_ry_0 = p_v_ry.position
     p_v_rx_0 = p_v_rx.position
     p_vx_0 = p_vx.position
     p_vy_0 = p_vy.position
     angle_step = (angle_end - angle_start) / num
     #x_step = (xe - xs) / num
-    yield from bps.movr(p_v_ry, angle_start)
+    # yield from bps.movr(p_v_ry, angle_start)
     yield from bps.movr(p_vx,-x_step*num/2)
     print(angle_start,angle_end,angle_step,num)
     for i in range(int(num+1)):
         caput('XF:03IDC-ES{Merlin:2}TIFF1:Capture',1)
         #print('running scan at ',p_v_ry.position)
         #yield from fly2d(dets2, ssx,-1,1,200, ssy, -1, 1, 200, 0.05, return_speed = 40)
-        yield from bps.movr(p_v_ry, angle_step)
+        # yield from bps.movr(p_v_ry, angle_step)
         yield from bps.movr(p_vx,x_step)
         merlin2.unstage()
         xspress3.unstage()
@@ -3525,7 +3525,7 @@ def zp_rock(angle_start,angle_end,x_step, num):
         yield from bps.sleep(2)
 
 
-    yield from bps.mov(p_v_ry,p_v_ry_0)
+    # yield from bps.mov(p_v_ry,p_v_ry_0)
     yield from bps.mov(p_vx,p_vx_0)
     yield from bps.mov(p_v_rx,p_v_rx_0)
     yield from bps.mov(p_vy,p_vy_0)

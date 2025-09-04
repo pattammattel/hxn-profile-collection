@@ -15,7 +15,7 @@ class HxnPrototypeMicroscope(Device):
 
     v_rz = Cpt(EpicsMotor, 'XF:03IDC-ES{Proto:1-Ax:3}Mtr')
     v_rx = Cpt(EpicsMotor, 'XF:03IDC-ES{Proto:1-Ax:4}Mtr')
-    v_ry = Cpt(EpicsMotor, 'XF:03IDC-ES{MCS:4-Ax:1}Mtr')
+    #v_ry = Cpt(EpicsMotor, 'XF:03IDC-ES{MCS:4-Ax:1}Mtr')
 
     osa_rz = Cpt(EpicsMotor, 'XF:03IDC-ES{Proto:1-Ax:5}Mtr')
     osa_ry = Cpt(EpicsMotor,'XF:03IDC-ES{MC:4-Ax:1}Mtr')
@@ -34,9 +34,9 @@ class HxnPrototypeMicroscope(Device):
     #bz = Cpt(EpicsMotor, 'XF:03IDC-ES{MC:4-Ax:4}Mtr')
     #bx = Cpt(EpicsMotor, 'XF:03IDC-ES{MC:4-Ax:2}Mtr')
 
-    bsx = Cpt(EpicsMotor, 'XF:03IDC-ES{MCS:3-Ax:1}Mtr')
-    bsy = Cpt(EpicsMotor, 'XF:03IDC-ES{MCS:3-Ax:3}Mtr')
-    bsz = Cpt(EpicsMotor, 'XF:03IDC-ES{MCS:3-Ax:2}Mtr')
+    # bsx = Cpt(EpicsMotor, 'XF:03IDC-ES{MCS:3-Ax:1}Mtr')
+    # bsy = Cpt(EpicsMotor, 'XF:03IDC-ES{MCS:3-Ax:3}Mtr')
+    # bsz = Cpt(EpicsMotor, 'XF:03IDC-ES{MCS:3-Ax:2}Mtr')
 
     #vth = Cpt(EpicsMotor, 'XF:03IDC-ES{MCS:4-Ax:1}Mtr')
 
@@ -48,7 +48,7 @@ p_vx = p.vx
 p_vy = p.vy
 p_vz = p.vz
 p_v_rx = p.v_rx
-p_v_ry = p.v_ry
+# p_v_ry = p.v_ry
 p_v_rz = p.v_rz
 
 p_osa_rz = p.osa_rz
@@ -68,9 +68,9 @@ p_osaz = p.osaz
 #p_bz = p.bz
 #p_bx = p.bx
 
-p_bsx = p.bsx
-p_bsy = p.bsy
-p_bsz = p.bsz
+# p_bsx = p.bsx
+# p_bsy = p.bsy
+# p_bsz = p.bsz
 
 #p_vth = p.vth
 
