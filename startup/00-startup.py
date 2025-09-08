@@ -12,6 +12,13 @@ from datetime import datetime, timedelta, tzinfo
 from pathlib import Path
 import threading
 
+import os
+if os.path.isfile('/data/users/startup_parameters/TILED_OFF'):
+    TILED_OFF = True
+else:
+    TILED_OFF = False
+
+
 warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 
@@ -106,42 +113,42 @@ datum_counts = {}
 
 from hxntools.CompositeBroker import sanitize_np,apply_to_dict_recursively
 
+if not TILED_OFF:
+    # Define a thread-safe cache for datum and resource documents
+    class ThreadSafeDocumentCache:
+        def __init__(self):
+            self._resource_deque = deque()
+            self._datum_deque = deque()
+            self._resource_lock = threading.Lock()
+            self._datum_lock = threading.Lock()
 
-# Define a thread-safe cache for datum and resource documents
-class ThreadSafeDocumentCache:
-    def __init__(self):
-        self._resource_deque = deque()
-        self._datum_deque = deque()
-        self._resource_lock = threading.Lock()
-        self._datum_lock = threading.Lock()
+        def append(self, name, doc):
+            if name == "resource":
+                with self._resource_lock:
+                    self._resource_deque.append(doc)
+            elif name == "datum":
+                with self._datum_lock:
+                    self._datum_deque.append(doc)
+            else:
+                raise ValueError(f"ThredSafeDocumentCache does not support document type: {name}")
 
-    def append(self, name, doc):
-        if name == "resource":
+        def popleft(self):
+            # Try to emmit a Resource first; if empty -- emmit Datum
             with self._resource_lock:
-                self._resource_deque.append(doc)
-        elif name == "datum":
+                if self._resource_deque:
+                    return "resource", self._resource_deque.popleft()
+
             with self._datum_lock:
-                self._datum_deque.append(doc)
-        else:
-            raise ValueError(f"ThredSafeDocumentCache does not support document type: {name}")
+                if self._datum_deque:
+                    return "datum", self._datum_deque.popleft()
 
-    def popleft(self):
-        # Try to emmit a Resource first; if empty -- emmit Datum
-        with self._resource_lock:
-            if self._resource_deque:
-                return "resource", self._resource_deque.popleft()
+            return None
 
-        with self._datum_lock:
-            if self._datum_deque:
-                return "datum", self._datum_deque.popleft()
+        def size(self):
+            with self._resource_lock, self._datum_lock:
+                return len(self._resource_deque) + len(self._datum_deque)
 
-        return None
-
-    def size(self):
-        with self._resource_lock, self._datum_lock:
-            return len(self._resource_deque) + len(self._datum_deque)
-
-tiled_document_cache = ThreadSafeDocumentCache()
+    tiled_document_cache = ThreadSafeDocumentCache()
 
 class CompositeRegistry(Registry):
     '''Composite registry.'''
@@ -184,10 +191,11 @@ class CompositeRegistry(Registry):
         resource_object.pop('_id', None)
         ret = resource_object['uid']
 
-        # Insert the Resource document into the cache to be written to Tiled. we need to wait until the document is
-        # fully constructed, because the TiledWriter thread might acces it before `uid` is set.
-        # Make a copy and remove the `id` key as it violates the document schema.
-        tiled_document_cache.append("resource", {k:v for k, v in resource_object.items() if k != 'id'})
+        if not TILED_OFF:
+            # Insert the Resource document into the cache to be written to Tiled. we need to wait until the document is
+            # fully constructed, because the TiledWriter thread might acces it before `uid` is set.
+            # Make a copy and remove the `id` key as it violates the document schema.
+            tiled_document_cache.append("resource", {k:v for k, v in resource_object.items() if k != 'id'})
 
         return ret
 
@@ -236,7 +244,8 @@ class CompositeRegistry(Registry):
         # ignore the second attempt to insert.
         try:
             kafka_publisher('datum', datum)
-            tiled_document_cache.append("datum", {k:v for k, v in datum.items() if k != '_id'})
+            if not TILED_OFF:
+                tiled_document_cache.append("datum", {k:v for k, v in datum.items() if k != '_id'})
 
             #col.insert_one(datum)
         except duplicate_exc:
@@ -297,7 +306,8 @@ class CompositeRegistry(Registry):
             apply_to_dict_recursively(dm, sanitize_np)
             to_write.append(pymongo.InsertOne(dm))
             d_uids.append(dm['datum_id'])
-            tiled_document_cache.append("datum", {k:v for k, v in dm.items() if k != '_id'})
+            if not TILED_OFF:
+                tiled_document_cache.append("datum", {k:v for k, v in dm.items() if k != '_id'})
 
         col.bulk_write(to_write, ordered=False)
 
