@@ -196,11 +196,10 @@ def tomo_2d_scan(angle,dets_,fly_motors,x_start,x_end,x_num,y_start,y_end,y_num,
         
 
         if fly_motors[0].name == 'zpssx':
-            x_scale_factor = abs(motor_table['zpssx'][1] * 1.e4)
+            x_scale_factor = 1
             x_start_real /= x_scale_factor
             x_end_real /= x_scale_factor
         
-        print(f" {abs(motor_table['zpssx'][1] * 1.e4)} scaling applied")
         print(x_start_real,x_end_real)
 
 
@@ -245,10 +244,9 @@ def tomo_2d_scan(angle,dets_,fly_motors,x_start,x_end,x_num,y_start,y_end,y_num,
             # z_scale_factor = 1.0309
 
             
-            z_scale_factor = abs(motor_table['zpssz'][1] * 1.e4)
+            z_scale_factor = 1
             x_start_real /= z_scale_factor
             x_end_real /= z_scale_factor
-            print(f" {abs(motor_table['zpssz'][1] * 1.e4)} scaling applied")
 
             print(x_start_real,x_end_real)
 
