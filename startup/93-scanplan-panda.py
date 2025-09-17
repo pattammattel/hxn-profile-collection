@@ -961,6 +961,7 @@ def flyscan_pd(detectors, start_signal, total_points, dwell, *,
         ion = panda_flyer.sclr
         if ion:
             yield from abs_set(ion.nuse_all, total_points, wait=True)
+            yield from abs_set(ion.input_mode, 2, wait=True)
             #yield from abs_set(ion.nuse_all, 2*xnum, wait=True)
 
         def panda_kickoff():

@@ -52,7 +52,7 @@ class HXNEnergy():
 
 
 
-    def calcGap(self,E,harmonics = 5, offset = 2):
+    def calcGap(self,E,harmonics = 5, offset = 0):
         E1 = E/harmonics
         calc_gap =  np.polyval(self.ugap_coeffs, E1) + offset
         return (np.around(calc_gap,1))
@@ -244,7 +244,7 @@ class HXNEnergy():
 
 
     
-    def autoUGapCalibration(self,EStart = 6, EEnd = 18, EStep = 48, ssa_close_pos = (1,0.25)):
+    def autoUGapCalibration(self,EStart = 14, EEnd = 6, EStep = 32, ssa_close_pos = (1,0.25)):
         """
         Make sure strating energy is at optimized conditions and you have a  good beam at ssa2
 
@@ -606,8 +606,8 @@ def foil_calib_scan(elem_line = "Cu_K", step_size_ev = 0.5, exp_time = 0.5,
     edgeE = xraydb.xray_edge(elem_line.split('_')[0],
                      elem_line.split('_')[1], 
                      True)/1000
-    endE = np.around(edgeE-0.050,4)
-    startE = np.around(edgeE+0.1,4)
+    startE = np.around(edgeE-0.050,4)
+    endE = np.around(edgeE+0.1,4)
     dE = endE-startE
     num_steps = int(dE/(step_size_ev*0.001))
     dUgap = Energy.calcGap(endE)-Energy.calcGap(startE)
@@ -803,5 +803,5 @@ def change_dets_energy(targetE):
     caput("XF:03IDC-ES{Det:Eiger1M}cam1:Acquire",0)
     caput("XF:03IDC-ES{Det:Eiger1M}cam1:PhotonEnergy", targetE*1000)
 
-Energy = HXNEnergy(ugap,e,dcm.p, "ic3", wd+"ugap_calib.csv")
+Energy = HXNEnergy(ugap,e,dcm.p, "ic3", wd+"ugap_calib2025C3.csv")
 

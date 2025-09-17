@@ -100,9 +100,11 @@ def patch_resource(doc):
     # Validate the structure if e.g. the datum shape is not declared in the descriptor
     # NOTE: Flyscannning specs often do not include the total number recorded points, only points per frame
     # NOTE: TPX_HDF5 has inconsistent shape definitions for eiger1 and merlin (stackable T/F)
-    if spec in ["XSP3_BULK", "MERLIN_HDF5_BULK", "ROI_HDF5_FLY", "SIS_HDF51_FLY_STREAM_V1",
-                "MERLIN_FLY_STREAM_V2", "PANDA"] + ["TPX_HDF5"]:
-        doc["resource_kwargs"].update({"_validate": True,"locking": False})
+    # if spec in ["XSP3_BULK", "MERLIN_HDF5_BULK", "ROI_HDF5_FLY", "SIS_HDF51_FLY_STREAM_V1",
+    #             "MERLIN_FLY_STREAM_V2", "PANDA"] + ["TPX_HDF5"]:
+    #     doc["resource_kwargs"].update({"_validate": True})
+
+    # doc["resource_kwargs"].update({"locking": False})
 
     return doc
 

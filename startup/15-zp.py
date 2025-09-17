@@ -76,7 +76,7 @@ smary = zps.smary
 smarz = zps.smarz
 
 
-zps = remove_names_maybe(zps, ['kill', 'zero'])
+#zps = remove_names_maybe(zps, ['kill', 'zero'])
 
 
 class HxnZP_OSA(NamedDevice):

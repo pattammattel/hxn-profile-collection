@@ -223,7 +223,7 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
     print(np.shape(images))
     num_frame,nnx,nny = np.shape(images)
 
-    mask = np.load('/data/users/2025Q2/Liu_2025Q2/mask_p2NaNMC_002_full2.npy')
+    mask = np.load('/data/users/2025Q3/TongchaoLiu_2025Q3/NaFeMnNi_111_4V/mask.npy')
     #mask = np.load('/data/users/2025Q2/Liu_2025Q2/diff_3_O3NCM_3.4V/mask.npy')
 
     for i in range(num_frame):
@@ -363,7 +363,7 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
 
     #"""
 
-    fn = '/data/users/2025Q2/Liu_2025Q2/diff_O3NaNMC_0V/'
+    fn = '/data/users/2025Q3/TongchaoLiu_2025Q3/NaFeMnNi_111_D2V/'
     
     if not os.path.exists(fn):
         os.makedirs(fn)

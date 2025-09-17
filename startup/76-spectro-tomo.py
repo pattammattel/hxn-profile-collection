@@ -247,8 +247,13 @@ def create_energy_angle_df(filename, XANESParam):
 def zp_tomo_2d_scan(angle,dets_,x_start,x_end,x_num,y_start,y_end,y_num,exp):
     print("zp tomo 2d scan")
     
-    x_scale_factor = 0.9542
-    z_scale_factor = 1.0309
+    from hxntools.motor_info import motor_table
+
+    # x_scale_factor = 0.9542
+    # z_scale_factor = 1.0309
+
+    x_scale_factor = abs(motor_table['zpssx'][1] * 1.e4)
+    z_scale_factor = abs(motor_table['zpssz'][1] * 1.e4)
 
     if np.abs(angle) < 44.99:
                 

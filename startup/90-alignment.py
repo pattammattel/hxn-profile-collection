@@ -512,8 +512,6 @@ def mll_vchi_alignment(vchi_start, vchi_end, vchi_num, mot, start, end, num, acq
     plt.show()
 
 
-
-
 def zp_z_alignment(z_start, z_end, z_num, mot, start, end, num, acq_time, 
                    elem=' ',linFlag = False,mon='sclr1_ch4'):
 
@@ -890,13 +888,9 @@ def zp_rot_scan(a_start, a_end, a_num, start, end, num, acq_time,
         yield from bps.movr(zps.smarz, dz*1000)
 
 
-
-
 def calc_rot_alignment(first_sid = -10, last_sid =-1, elem = "Cr"):
 
     pass
-
-
 
 
 def mll_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time, elem='Pt_L', move_flag=0, threshold = 0.5):
@@ -1035,13 +1029,6 @@ def refit_rot_align(scan_list, elem, threshold):
 
     #moving back to intial y position
     print(f'{dx = :.2f}, {dz = :.2f}')
-
-
-
-
-
-        
-
 
 
 def mll_rot_alignment_2D(th_start, th_end, th_num, x_start, x_end, x_num,
@@ -1214,8 +1201,7 @@ def get_scan_command(sid):
             print (f"fly2dpd({m1},{s1:.3f},{e1:.3f},{n1},{m2},{s2 :.3f},{e2 :.3f},{n2},{exp_time})")
             return (f"fly2dpd({m1},{s1:.3f},{e1:.3f},{n1},{m2},{s2 :.3f},{e2 :.3f},{n2},{exp_time})")
             
-            
-            
+                     
 def repeat_scan(sid):
     h = db[sid]
     sid = h.start['scan_id']
@@ -1281,7 +1267,6 @@ def save_cam06_images(filename = "crl"):
         print(i)
         time.sleep(2)
         caput('XF:03IDC-ES{CAM:06}TIFF1:WriteFile',1)
-
 
 
 def mov_diff(gamma, delta, r=500, calc=0, check_for_dexela = True):
@@ -1456,7 +1441,6 @@ def diff_to_home(move_out_later = False):
         yield from go_det("merlin") #same as 0,0,500
 
 
-
 def do_motor_position_checks(check_list_dict, rel_tol_per = 25,abs_tol = 20, message_string = " "):
 
 
@@ -1484,8 +1468,6 @@ def do_motor_position_checks(check_list_dict, rel_tol_per = 25,abs_tol = 20, mes
             if not math.isclose(mtr.position, target_pos, rel_tol=rel_tol_per*0.01):
                 raise ValueError(f"{mtr.name} is not close to the required position\n"
                                          f"{message_string}")
-
-
 
 
 def go_det(det, disable_checks = False, mll = True):
@@ -1608,8 +1590,6 @@ def go_det(det, disable_checks = False, mll = True):
                 'Available ones are merlin, cam11, telescope, eiger and tpx')
 
 
-
-
 def update_det_pos(det = "merlin", do_confirm = True):
 
     # print("!!!Do not update position directly from function, edit  ~/.ipython/profile_collection/startup/diff_det_pos.json to modify detector positions.!!!")
@@ -1695,7 +1675,6 @@ def update_det_pos(det = "merlin", do_confirm = True):
             json.dump(diff_pos, out_file, indent = 6)
 
         out_file.close()
-
 
 
 def find_45_degree(th_mtr,start_angle,end_angle,num, x_start, x_end, x_num, exp_time=0.02, elem="Pt_L"):
@@ -1799,10 +1778,55 @@ def find_45_offset(data_path = "/nsls2/data/hxn/legacy/users/Beamline_Performanc
     plt.show()
     return optimal_offset
 
+
+def find_45_degree_fullrange(th_mtr,start_angle,end_angle,angle_step, x_start, x_end, x_num, exp_time=0.02, elem="Pt_L"):
+
+
+    ''' Usage: find_45_degree_fullrange(zpsth,-5,5,3,-12, 12,200, exp_time=0.03,elem="Au_L") '''
+    
+    time_ = datetime.now().strftime("%Y%m%d_%H%M%S")
+    save_name = f"find_45_{th_mtr.name}_{start_angle}_to_{end_angle}_{time_}"
+    header = "scan_motor th wx sid"
+
+    if th_mtr == dsth:
+        x_mtr, z_mtr = dssx, dssz
+
+    elif th_mtr == zpsth:
+        x_mtr, z_mtr = zpssx, zpssz
+
+    angle_list = np.arange(start_angle, end_angle+0.1,angle_step)
+    print(f"{angle_list = }")
+    num = len(angle_list)
+    scan_motor = np.empty(num, dtype='<U20')
+    x_sid = np.zeros(num)
+    w_x = np.zeros(num)
+    th = np.zeros(num)
+    
+    for i, angle in enumerate(angle_list):
+        yield from bps.mov(th_mtr,angle)
+        if np.abs(angle) <= 45.:
+            yield from fly1dpd(dets_fast_fs,x_mtr,x_start,x_end,x_num,exp_time)
+            print(x_mtr.name)
+            scan_motor[i] = str(x_mtr.name)
+        else:
+            yield from fly1dpd(dets_fast_fs,z_mtr,x_start,x_end,x_num,exp_time)
+            scan_motor[i] = str(z_mtr.name)
+
+        l,r,c=square_fit(-1,elem)
+        plt.close()
+        w_x[i] = r-l
+        x_sid[i] = db[-1].start.get('scan_id')
+        th[i]=th_mtr.position
+        yield from bps.sleep(1)
+        
+        np.savetxt(f"/nsls2/data/hxn/legacy/users/Beamline_Performance/find_45_scans/{save_name}.txt",
+                   np.column_stack([np.array(scan_motor),th,w_x,x_sid]), header = header, fmt = '%s')
+
+    return th,w_x
+
 def find_45_offset_scaling(data_path = "/nsls2/data/hxn/legacy/users/Beamline_Performance/45deg_calib.txt"):
 
     """ usage :find_45_offset() """
-
 
     data = np.loadtxt(data_path)
     # Define the objective function
@@ -2139,7 +2163,6 @@ def mll_to_upstream_no_re():
         return
 
 
-
 def mll_to_downstream():
 
     if abs(hmll.hz.position)>7980 and not mllosa.osaz.position>100:
@@ -2315,8 +2338,6 @@ def mlls_optics_out_for_cam11():
         pass
 
 
-
-
 def zero_child_components(parent_ = mllosa, tolerance =10):
 
     for comps in parent_.component_names:
@@ -2490,7 +2511,6 @@ def zp_to_cam11_view():
     if zp_bsx_pos<20:
 
         caput("XF:03IDC-ES{ANC350:8-Ax:1}Mtr.VAL", zp_bsx_pos+100)
-
 
 
 def zp_bs_out(wait_till_finish = True):

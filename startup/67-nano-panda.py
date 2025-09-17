@@ -821,6 +821,7 @@ def timescan_pd(detectors, num, dwell, *,
         ion = panda_flyer.sclr
         if ion:
             yield from abs_set(ion.nuse_all, num_total, wait=True)
+            yield from abs_set(ion.input_mode, 2, wait=True)
             #yield from abs_set(ion.nuse_all, 2*xnum, wait=True)
 
         if verbose:
@@ -1392,6 +1393,7 @@ def scan_and_fly_2dpd(detectors, xcenter, xrange, xnum, ystart, ystop, ynum, dwe
         ion = panda_flyer.sclr
         if ion:
             yield from abs_set(ion.nuse_all, num_total, wait=True)
+            yield from abs_set(ion.input_mode, 2, wait=True)
             #yield from abs_set(ion.nuse_all, 2*xnum, wait=True)
 
         if verbose:
@@ -1979,6 +1981,7 @@ def scan_and_fly_2dpd(detectors, xcenter, xrange, xnum, ystart, ystop, ynum, dwe
         ion = panda_flyer.sclr
         if ion:
             yield from abs_set(ion.nuse_all, num_total, wait=True)
+            yield from abs_set(ion.input_mode, 2, wait=True)
             #yield from abs_set(ion.nuse_all, 2*xnum, wait=True)
 
         if verbose:

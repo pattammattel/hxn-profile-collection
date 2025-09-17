@@ -638,6 +638,7 @@ def time_scan(detectors, num, dwell, *,
         ion = flyer.sclr
         if ion:
             yield from bps.abs_set(ion.nuse_all, num_total, wait=True)
+            yield from abs_set(ion.input_mode, 2, wait=True)
             #yield from bps.abs_set(ion.nuse_all, 2*xnum, wait=True)
 
         if verbose:

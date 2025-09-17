@@ -772,8 +772,13 @@ def zp_tomo_scan_aligned(angle_start, angle_end, angle_step, x_start, x_end, x_n
     #caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0',0)
     angle_num = int(np.ceil(np.abs((angle_end-angle_start)/angle_step)))
 
-    x_scale_factor = 0.9542
-    z_scale_factor = 1.0309
+    from hxntools.motor_info import motor_table
+
+    # x_scale_factor = 0.9542
+    # z_scale_factor = 1.0309
+
+    x_scale_factor = abs(motor_table['zpssx'][1] * 1.e4)
+    z_scale_factor = abs(motor_table['zpssz'][1] * 1.e4)
 
     if ic_0 is None:
         ic_0 = sclr2_ch2.get()
@@ -1129,8 +1134,14 @@ def zp_tomo_scan_scale(angle_start, angle_end, angle_num, x_start, x_end, x_num,
         merlin1.unstage()
         xspress3.unstage()
 
-        x_scale_factor = 0.9542
-        z_scale_factor = 1.0309
+        from hxntools.motor_info import motor_table
+
+        # x_scale_factor = 0.9542
+        # z_scale_factor = 1.0309
+
+        x_scale_factor = abs(motor_table['zpssx'][1] * 1.e4)
+        z_scale_factor = abs(motor_table['zpssz'][1] * 1.e4)
+
         angle_offset = 0. #-2.18
 
         angle_tmp = angle #+ angle_offset
@@ -1197,9 +1208,6 @@ def zp_tomo_scan_scale(angle_start, angle_end, angle_num, x_start, x_end, x_num,
         #    yield from peak_bpm_y(-10, 10, 10)
     save_page()
 
-
-
-
 def tomo_slice_scan(angle_start, angle_end, angle_num, x_start, x_end, x_num,
                     y_start, y_end, y_num, exposure):
     angle_start = float(angle_start)
@@ -1231,13 +1239,10 @@ def tomo_slice_scan(angle_start, angle_end, angle_num, x_start, x_end, x_num,
     mov(zpsth, 0)
 
 
-
-
 def reset_tpx(num):
     for i in range(1000):
         timepix2.cam.num_images.put(num, wait=False)
         sleep(0.5)
-
 
 
 def th_fly1d(th_start, th_end, num, offset, mot, m_start, m_end, m_num, sec):
@@ -1512,7 +1517,7 @@ def zp_th_fly2d(dets,th_start, th_end, num, mot1, x_start, x_end, x_num, mot2, y
     #<zp_th_fly2d(-1,1,40,zpssx, -10,10,30,zpssy,-10,10,30,0.03,elem ='Cu', do_align = False, xy_offset = (0,0))
 
 def zp_th_fly2dpd(dets,th_start, th_end, num, mot1, x_start, x_end, x_num, mot2, y_start, y_end, y_num, sec,
-                elem = 'Bi_M',do_align = True, xy_offset = (0,0),line_scan = False, align_with_com=False):
+                elem = 'Pt_L',do_align = True, xy_offset = (0,0),line_scan = False, align_with_com=False):
 
     '''move theta position relative and collect 2D scans
 
@@ -1565,8 +1570,7 @@ def zp_th_fly2dpd(dets,th_start, th_end, num, mot1, x_start, x_end, x_num, mot2,
 
 
 
-            yield from bps.movr(smary,-0*0.001)#################################################################################
-            #yield from bps.movr(zpssx,2)
+            yield from bps.movr(smary,-0*0.001)
 
 
         #yield from bps.movr(mot2,xy_offset[1])

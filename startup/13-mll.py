@@ -55,7 +55,7 @@ sz = smll.sz
 # sz1 = smll.sz1
 
 
-smll = remove_names_maybe(smll, ['kill', 'zero'])
+#smll = remove_names_maybe(smll, ['kill', 'zero'])
 
 
 class HxnMLLDiffractionSample(NamedDevice):

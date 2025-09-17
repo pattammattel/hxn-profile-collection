@@ -74,8 +74,13 @@ def zp_tomo_scan_rapid(angle_start, angle_end, angle_step, x_start, x_end, x_num
     #caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0',0)
     angle_num = int(np.ceil(np.abs((angle_end-angle_start)/angle_step)))
 
-    x_scale_factor = 0.9542
-    z_scale_factor = 1.0309
+    from hxntools.motor_info import motor_table
+
+    # x_scale_factor = 0.9542
+    # z_scale_factor = 1.0309
+
+    x_scale_factor = abs(motor_table['zpssx'][1] * 1.e4)
+    z_scale_factor = abs(motor_table['zpssz'][1] * 1.e4)
 
     if ic_0 is None:
         ic_0 = sclr2_ch2.get()
