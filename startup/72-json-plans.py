@@ -1339,3 +1339,179 @@ def run_diff_json(path_to_json,tracking_file = None,do_confirm =True):
 
         #save pdf
         save_page()
+
+
+
+
+def run_repeat_2d_json(path_to_json, n_repeat=10, tracking_file=None, do_confirm=True):
+    """
+    Perform repeated diffraction scans (n_repeat times) at a single angle using
+    parameters from a JSON file, including x/y/2D alignment scans before each run.
+
+    Example:
+        RE(run_diff_json_repeat('/path/to/diff_params.json', n_repeat=10))
+    """
+    beamDumpOccured = False
+    fluxPeaked = False
+
+    # Load JSON
+    with open(path_to_json, "r") as fp:
+        diff_params = json.load(fp)
+    print("json file loaded")
+
+    # Motors and detectors
+    fly_motors = [eval(item) for item in diff_params["fly_motors"]]
+    th_motor = eval(diff_params["th_motor"])
+
+    # Determine scan angle
+    if "angle_info" in diff_params and "start" in diff_params["angle_info"]:
+        scan_angle = diff_params["angle_info"]["start"]
+    else:
+        scan_angle = th_motor.position
+
+    # Initial IC readings
+    ic_0 = sclr2_ch2.get()
+    caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0', 1)
+    yield from bps.sleep(2)
+    ic_3_init = sclr2_ch4.get()
+    caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0', 0)
+
+    # Create DataFrame
+    repeat_list = pd.DataFrame(columns=['scan_id', 'iteration', 'energy_rbv', 'IC3', 'IC0',
+                                        'Peak Flux', 'TimeStamp', fly_motors[1].name])
+    repeat_list['iteration'] = np.arange(1, n_repeat + 1)
+
+    # Estimate time
+    image_scan_i = diff_params["fly2d_scan"]
+    tot_time_ = (image_scan_i["x_num"] * image_scan_i["y_num"] *
+                 image_scan_i["exposure"] * n_repeat)
+    tot_time = tot_time_ / 3600
+    overhead = 1.2
+    end_datetime = time.ctime(time.time() + tot_time_ * overhead)
+
+    if do_confirm:
+        check = input(f"This plan will take about {tot_time*overhead:.1f} hours, "
+                      f"projected to finish {end_datetime}. Continue (y/n)? ")
+    else:
+        check = 'y'
+
+    if check.lower() != 'y':
+        print("Scan aborted by user.")
+        return
+
+    print(f"Running {n_repeat} repeated scans at angle = {scan_angle:.3f}")
+
+    # Set pause/stop flags
+    diff_params["stop_iter"] = False
+    diff_params["pause_scan"] = False
+    with open(path_to_json, "w") as fp:
+        json.dump(diff_params, fp, indent=6)
+
+    for n in range(n_repeat):
+        print(f"=== Scan {n+1}/{n_repeat} ===")
+
+        # Re-read JSON in case user edited mid-scan
+        with open(path_to_json, "r") as fp:
+            diff_params = json.load(fp)
+
+        # stop/pause logic
+        if diff_params.get("stop_iter", False):
+            save_page()
+            print("Scan stopped by user.")
+            break
+
+        while diff_params.get("pause_scan", False):
+            yield from bps.sleep(5)
+            with open(path_to_json, "r") as fp:
+                diff_params = json.load(fp)
+
+        # Move to scan angle
+        yield from bps.mov(th_motor, scan_angle)
+
+        # --- Alignment Scans ---
+        xalign = diff_params["xalign"]
+        yalign = diff_params["yalign"]
+        align_2d = diff_params["align_2d_com"]
+
+        # X alignment
+        if xalign["do_align"]:
+            yield from align_scan(
+                fly_motors[0],
+                xalign["start"], xalign["end"], xalign["num"],
+                xalign["exposure"], xalign["elem"], xalign["center_with"],
+                xalign["threshold"], xalign["move_coarse"], xalign["neg_flag"],
+                xalign["offset"], diff_params["flying_panda"],
+                xalign["zero_before_scan"], xalign["initial_position"],
+                xalign["align_movement_limit"]
+            )
+
+        # 2D alignment
+        if align_2d["do_align"]:
+            yield from align_2d_com_scan(
+                fly_motors[0],
+                align_2d["x_start"], align_2d["x_end"], align_2d["x_num"],
+                fly_motors[1],
+                align_2d["y_start"], align_2d["y_end"], align_2d["y_num"],
+                align_2d["exposure"], align_2d["elem"], align_2d["threshold"],
+                align_2d["move_x"], align_2d["move_y"],
+                align_2d["x_offset"], align_2d["y_offset"],
+                diff_params["flying_panda"]
+            )
+
+        # Y alignment
+        if yalign["do_align"]:
+            yield from align_scan(
+                fly_motors[1],
+                yalign["start"], yalign["end"], yalign["num"],
+                yalign["exposure"], yalign["elem"], yalign["center_with"],
+                yalign["threshold"], yalign["move_coarse"], yalign["neg_flag"],
+                yalign["offset"], diff_params["flying_panda"],
+                yalign["zero_before_scan"], yalign["initial_position"],
+                yalign["align_movement_limit"]
+            )
+
+        yield from bps.sleep(2)
+
+        # --- Beam Check and Flux Peaking ---
+        if not diff_params["test"]:
+            if sclr2_ch2.get() < 1000:
+                beamDumpOccured = True
+                yield from check_for_beam_dump()
+
+            if beamDumpOccured:
+                yield from bps.sleep(60)
+                yield from recover_from_beamdump()
+                beamDumpOccured = False
+
+            caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0', 1)
+            yield from bps.sleep(2)
+            if (sclr2_ch4.get() < (diff_params["ic_threshold"] * ic_3_init)):
+                yield from peak_the_flux()
+                ic_0 = sclr2_ch2.get()
+                fluxPeaked = True
+            caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0', 0)
+
+        # --- Run Diffraction Scan ---
+        yield from diff_scan_to_loop(scan_angle, diff_params, ic_0, tracking_file=tracking_file)
+
+        # --- Record Results ---
+        last_sid = int(caget('XF:03IDC-ES{Status}ScanID-I'))
+        repeat_list.at[n, 'scan_id'] = last_sid
+        repeat_list.at[n, 'energy_rbv'] = e.position
+        repeat_list.at[n, 'IC3'] = sclr2_ch4.get()
+        repeat_list.at[n, 'IC0'] = sclr2_ch2.get()
+        repeat_list.at[n, 'Peak Flux'] = fluxPeaked
+        repeat_list.at[n, 'TimeStamp'] = pd.Timestamp.now()
+        repeat_list.at[n, fly_motors[1].name] = fly_motors[1].position
+        fluxPeaked = False
+
+        # Save after each repeat
+        filename = f"{diff_params.get('scan_label','repeat_diff')}_n{n_repeat}_startID{int(repeat_list['scan_id'][0])}.csv"
+        repeat_list.to_csv(os.path.join(diff_params.get("save_log_to", "/data/users/current_user"), filename),
+                           float_format='%.5f')
+
+        print(f"Repeat scan {n+1}/{n_repeat} done and logged.")
+
+    # Final save
+    save_page()
+    print("All repeated scans completed successfully.")

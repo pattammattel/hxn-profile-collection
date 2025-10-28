@@ -1,15 +1,4 @@
-#Last Update 09/11/2021 by AP
-
-"""
-
-ReadMe:
-
-
-
-EXAMPLE OF USAGE:
-
-
-"""
+print(f"Loading {__file__!r} ...")
 
 
 import numpy as np

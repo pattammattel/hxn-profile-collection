@@ -50,8 +50,16 @@ def recover_pos_and_scan(label,roi_positions, dets, mot1, mot1_s, mot1_e, mot1_n
     else:
         pass
     RE.md["scan_name"] = str(label)
+
+    dets = dets_fast
+
+    try:
     
-    yield from fly2dpd(dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s, mot2_e, mot2_n, exp_t)
+        yield from fly2dpd(dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s, mot2_e, mot2_n, exp_t)
+
+        yield from piezos_to_zero()
+
+    except: pass
 
 
 def fly2d_qserver_plan(label, dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s, mot2_e, mot2_n, exp_t):
@@ -72,124 +80,218 @@ def send_fly2d_to_queue(label, dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s,
             mot2_e, 
             mot2_n, 
             exp_t)))
-
-def mosaic_overlap_scan_for_queue(dets, ylen = 100, xlen = 100, overlap_per = 15, dwell = 0.05,
-                        step_size = 500, plot_elem = ["Cl"],using_mll = False):
-
-    max_travel = 30
-
-    dsx_i = dsx.position
-    dsy_i = dsy.position
-
-    smarx_i = smarx.position
-    smary_i = smary.position
-
-    scan_dim = max_travel - round(max_travel*overlap_per*0.01)
-
-    x_tile = round(xlen/scan_dim)
-    y_tile = round(ylen/scan_dim)
-
-    xlen_updated = scan_dim*x_tile
-    ylen_updated = scan_dim*y_tile
-
-
-    X_position = np.linspace(0,xlen_updated-scan_dim,x_tile)
-    Y_position = np.linspace(0,ylen_updated-scan_dim,y_tile)
     
-    X_position_abs = smarx.position*1000+(X_position)
-    Y_position_abs = smary.position*1000+(Y_position)
-
-    num_steps = round(max_travel*1000/step_size)
-
-    if using_mll:
-
-        yield from bps.movr(dsy, ylen_updated/-2)
-        yield from bps.movr(dsx, xlen_updated/-2)
-        X_position_abs = dsx.position+(X_position)
-        Y_position_abs = dsy.position+(Y_position)
-        
-
-    else:
-        yield from bps.movr(smary, ylen_updated*-0.001/2)
-        yield from bps.movr(smarx, xlen_updated*-0.001/2)
-        X_position_abs = smarx.position+(X_position*0.001)
-        Y_position_abs = smary.position+(Y_position*0.001)
-        
-        print(X_position_abs)
-        print(Y_position_abs)
-        
-        
-    for i in tqdm.tqdm(Y_position_abs):
-            for j in tqdm.tqdm(X_position_abs):
-                print((i,j))
-                yield from check_for_beam_dump(threshold=5000)
-                yield from bps.sleep(1) #cbm catchup time
-
-                if using_mll:
-
-                    yield from bps.mov(dsy, i)
-                    yield from bps.mov(dsx, j)
-                    yield from fly2d(dets,dssx,-15,15,num_steps,dssy,-15,15,num_steps,dwell)
-                    yield from bps.sleep(1)
-                    yield from bps.mov(dssx,0,dssy,0)
-
-                else:
-
-                    yield from bps.mov(smary, i)
-                    yield from bps.mov(smarx, j)
-                    yield from fly2d(dets, zpssx,-15,15,num_steps,zpssy, -15,15,num_steps,dwell)
-                    yield from bps.sleep(1)
-                    yield from bps.mov(zpssx,0,zpssy,0)
 
 
-def send_mosaic_overlap_scan_to_queue(dets, ylen = 100, xlen = 100, overlap_per = 15, dwell = 0.05,
-                        step_size = 500, plot_elem = ["Cl"],using_mll = False):
+def align_and_scan(
+        dets,
+        x_motor, x_start, x_end, x_num,
+        y_motor,y_start, y_end, y_num,
+        exposure=0.01,
+        elem='Pt_L',
+        pad_frac=0.5,
+        do_2d_align=False,
+        tomo_use_panda=True
+    ):
+    """
+    Aligns a particle using 1D (X, Y) and optional 2D COM alignment scans,
+    then performs a 2D fly scan.
 
-    max_travel = 30
-    scan_dim = max_travel - round(max_travel*overlap_per*0.01)
+    Alignment ranges are automatically derived from the 2D scan window by
+    adding a fractional padding (pad_frac), and step sizes are scaled
+    relative to the 2D fly scan resolution.
 
-    x_tile = round(xlen/scan_dim)
-    y_tile = round(ylen/scan_dim)
+    Parameters
+    ----------
+    x_motor, y_motor : EpicsMotor
+        Motors to use for the 2D scan.
+    x_start, x_end, x_num : float
+        Range and number of points for X fly scan.
+    y_start, y_end, y_num : float
+        Range and number of points for Y fly scan.
+    exposure : float
+        Exposure time per point (seconds).
+    elem : str
+        Element edge for XRF alignment signal.
+    pad_frac : float
+        Fractional padding for alignment range (default = 0.2).
+    do_2d_align : bool
+        Whether to perform a 2D COM alignment between 1D alignments.
+    tomo_use_panda : bool
+        Use Panda trigger mode for scans.
 
-    xlen_updated = scan_dim*x_tile
-    ylen_updated = scan_dim*y_tile
+    Example
+    -------
+    RE(particle_align_and_scan(zps.sx, zps.sy, -5, 5, 100, -5, 5, 100, 0.05, 'Pt_L'))
+    """
+
+    # --- Compute padded ranges ---
+    x_range = x_end - x_start
+    y_range = y_end - y_start
+
+    x_pad = pad_frac * x_range / 2
+    y_pad = pad_frac * y_range / 2
+
+    x_align_start = x_start - x_pad
+    x_align_end   = x_end + x_pad
+    y_align_start = y_start - y_pad
+    y_align_end   = y_end + y_pad
+
+    # --- Proportional step sizes ---
+    x_step_size = (x_end - x_start) / max(x_num, 1)
+    y_step_size = (y_end - y_start) / max(y_num, 1)
+
+    # coarser alignment resolution (~1/3 of fly scan)
+    x_align_num = max(5, int((x_align_end - x_align_start) / (3 * x_step_size)))
+    y_align_num = max(5, int((y_align_end - y_align_start) / (3 * y_step_size)))
+
+    print(f"→ X alignment range: {x_align_start:.2f} to {x_align_end:.2f}, {x_align_num} pts")
+    print(f"→ Y alignment range: {y_align_start:.2f} to {y_align_end:.2f}, {y_align_num} pts")
+
+    # --- 1D X alignment ---
+    print("→ Performing X alignment...")
+    yield from align_scan(
+        x_motor,
+        x_align_start, x_align_end, x_align_num,
+        exposure, elem,
+        align_with="line_center",
+        threshold=0.5,
+        move_coarse=False,
+        neg_flag=False,
+        offset=0,
+        tomo_use_panda=tomo_use_panda,
+        reset_piezos_to_zero=True,
+        initial_position=0,
+        align_movement_limit=3
+    )
+
+    # --- Optional 2D COM alignment ---
+    if do_2d_align:
+        print("→ Performing 2D COM alignment...")
+        yield from align_2d_com_scan(
+            x_motor,
+            x_align_start, x_align_end, x_align_num,
+            y_motor,
+            y_align_start, y_align_end, y_align_num,
+            exposure, elem,
+            threshold=0.5,
+            move_x=True, move_y=True,
+            x_offset=0, y_offset=0,
+            tomo_use_panda=tomo_use_panda
+        )
+
+    # --- 1D Y alignment ---
+    print("→ Performing Y alignment...")
+    yield from align_scan(
+        y_motor,
+        y_align_start, y_align_end, y_align_num,
+        exposure, elem,
+        align_with="line_center",
+        threshold=0.5,
+        move_coarse=False,
+        neg_flag=False,
+        offset=0,
+        tomo_use_panda=tomo_use_panda,
+        reset_piezos_to_zero=True,
+        initial_position=0,
+        align_movement_limit=3
+    )
+
+    # --- Final 2D Fly Scan ---
+    print("→ Running 2D fly scan with fly2dpd...")
+    yield from fly2dpd(
+        dets,
+        x_motor, x_start, x_end, x_num,
+        y_motor, y_start, y_end, y_num,
+        exposure
+    )
+
+    print("✅ Particle alignment and 2D scan complete.")
+
+def align_and_scan_qserver_plan(
+        label,
+        dets,
+        x_motor, x_start, x_end, x_num,
+        y_motor, y_start, y_end, y_num,
+        exposure=0.01,
+        elem='Pt_L',
+        pad_frac=0.5,
+        do_2d_align=False,
+        tomo_use_panda=True
+    ):
+    """
+    QServer-compatible version of align_and_scan().
+    Assigns RE.md['scan_name'] = label and runs the full alignment + 2D scan plan.
+    """
+    RE.md["scan_name"] = str(label)
+    yield from align_and_scan(
+        eval(dets),
+        eval(x_motor), x_start, x_end, x_num,
+        eval(y_motor), y_start, y_end, y_num,
+        exposure,
+        elem,
+        pad_frac,
+        do_2d_align,
+        tomo_use_panda
+    )
 
 
-    X_position = np.linspace(0,xlen_updated-scan_dim,x_tile)
-    Y_position = np.linspace(0,ylen_updated-scan_dim,y_tile)
+def send_align_and_scan_to_queue(
+        label,
+        dets,
+        x_motor, x_start, x_end, x_num,
+        y_motor, y_start, y_end, y_num,
+        exposure=0.01,
+        elem='Pt_L',
+        pad_frac=0.5,
+        do_2d_align=False,
+        tomo_use_panda=True
+    ):
+    """
+    Adds an align_and_scan plan to the Bluesky Queue Server.
 
+    Parameters
+    ----------
+    label : str
+        Descriptive scan label (stored in RE.md["scan_name"])
+    dets : str
+        String for detector list (e.g. "[xs, sclr]")
+    x_motor, y_motor : str
+        Strings of motor objects (e.g. "zps.sx", "zps.sy")
+    x_start, x_end, x_num : float
+        Range and number of points for X motor
+    y_start, y_end, y_num : float
+        Range and number of points for Y motor
+    exposure : float
+        Exposure time per point (s)
+    elem : str
+        Element name for XRF alignment
+    pad_frac : float
+        Fractional padding for alignment (default 0.5)
+    do_2d_align : bool
+        Whether to run 2D COM alignment between 1D alignments
+    tomo_use_panda : bool
+        Use Panda trigger mode during scans
+    """
 
-    num_steps = round(max_travel*1000/step_size)
+    det_names = [d.name for d in eval(dets)]
 
-    unit = "minutes"
-    fly_time = (num_steps**2)*dwell*2
-    num_flys= len(X_position)*len(Y_position)
-    total_time = (fly_time*num_flys)/60
-
-
-    if total_time>60:
-        total_time/=60
-        unit = "hours"
-
-    #print(f'total time = {total_time} {unit}; 10 seconds to quit')
-
-    ask = input(f"Optimized scan x and y range = {xlen_updated} by {ylen_updated};"
-     f"\n total time = {total_time} {unit}"
-     f"\n Do you wish to send it to queue? (y/n) ")
-
-    if ask == 'y':
-
-            det_names = [d.name for d in dets]
-            RM.item_add((BPlan("mosaic_overlap_scan_for_queue",
+    RM.item_add(
+        BPlan(
+            "align_and_scan_qserver_plan",
+            label,
             det_names,
-            ylen = ylen, 
-            xlen = xlen, 
-            overlap_per = overlap_per, 
-            dwell = dwell,
-            step_size = step_size, 
-            plot_elem = plot_elem,
-            using_mll = using_mll)))
+            x_motor, x_start, x_end, x_num,
+            y_motor, y_start, y_end, y_num,
+            exposure,
+            elem,
+            pad_frac,
+            do_2d_align,
+            tomo_use_panda
+        )
+    )
 
+    print(f"✅ Added '{label}' align_and_scan plan to QServer queue.")
 
 
 def get_scan_num_label(plan_dict):

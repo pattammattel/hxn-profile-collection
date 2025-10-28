@@ -1,4 +1,4 @@
-
+print(f"Loading {__file__!r} ...")
 
 
 def make_zp_tomo_plan(save_as = "/nsls2/data/hxn/legacy/user_macros/HXN_GUI/Scan/temp_files/zp_tomo_params.json" ):
@@ -80,8 +80,8 @@ def zp_tomo_2d_scan_loop(angle,dets_,x_start,x_end,x_num,y_start,y_end,y_num,exp
     # x_scale_factor = 0.9542
     # z_scale_factor = 1.0309
 
-    x_scale_factor = abs(motor_table['zpssx'][1] * 1.e4)
-    z_scale_factor = abs(motor_table['zpssz'][1] * 1.e4)
+    x_scale_factor = 1
+    z_scale_factor = 1
 
     if np.abs(angle) < 44.99:
                 

@@ -74,7 +74,7 @@ def get_xrf_data(h,elem ="Cr",mon ='sclr1_ch4'):
         
     return xdata,xrf
 
-def erf_fit(sid, elem, mon='sclr1_ch4', linear_flag=True):
+def erf_fit(sid, elem, mon='sclr1_ch4', linear_flag=True,show_figure = True):
     h = db[sid]
     sid = h.start['scan_id']
     xdata, ydata = get_xrf_data(h,
@@ -85,8 +85,9 @@ def erf_fit(sid, elem, mon='sclr1_ch4', linear_flag=True):
     y_min=np.min(ydata)
     y_max=np.max(ydata)
     ydata=(ydata-y_min)/(y_max-y_min)
-    plt.figure()
-    plt.plot(xdata,ydata,'bo')
+    if show_figure:
+        plt.figure()
+        plt.plot(xdata,ydata,'bo')
     y_mean = np.mean(ydata)
     half_size = int (len(ydata)/2)
     y_half_mean = np.mean(ydata[0:half_size])
@@ -105,8 +106,9 @@ def erf_fit(sid, elem, mon='sclr1_ch4', linear_flag=True):
         else:
             popt,pcov=curve_fit(erfunc4,xdata,ydata,p0=[edge_pos,0.05,0.5,0,0])
             fit_data=erfunc4(xdata,popt[0],popt[1],popt[2],popt[3],popt[4]);
-    plt.plot(xdata,fit_data, 'r')
-    plt.title(f'{sid = }, edge = {popt[0] :.3f}, FWHM = {popt[1]*2354.8 :.2f} nm')
+    if show_figure:
+        plt.plot(xdata,fit_data, 'r')
+        plt.title(f'{sid = }, edge = {popt[0] :.3f}, FWHM = {popt[1]*2354.8 :.2f} nm')
     return (popt[0],popt[1]*2.3548*1000.0)
 
 def erf_fit_to_delete(sid, elem, mon='sclr1_ch4', linear_flag=True):
@@ -740,43 +742,9 @@ def return_tip_pos(sid,elem='Cr'):
     #print(x[peak_index[0][0]+1])
     return x[peak_index[0][0]+1]
 
-def zp_rot_alignment_edge(a_start, a_end, a_num, start, end, num, acq_time, elem='Pt_L', move_flag=0):
-    a_step = (a_end - a_start)/a_num
-    x = np.zeros(a_num+1)
-    y = np.zeros(a_num+1)
-    orig_th = zps.zpsth.position
-    for i in range(a_num+1):
-        x[i] = a_start + i*a_step
-        yield from bps.mov(zps.zpsth, x[i])
-        if np.abs(x[i]) > 45:
-            yield from fly1dpd(dets1,zpssz,start,end,num,acq_time)
-            #tmp = return_line_center(-1, elem=elem,threshold=0.5)
-            edge,fwhm = erf_fit(-1,elem = elem,linear_flag=False)
-            y[i] = edge*np.sin(x[i]*np.pi/180.0)
-        else:
-            yield from fly1dpd(dets1,zpssx,start,end,num,acq_time)
-            #tmp = return_line_center(-1,elem=elem,threshold=0.5)
-            edge,fwhm = erf_fit(-1,elem = elem,linear_flag=False)
-            y[i] = edge*np.cos(x[i]*np.pi/180.0)
-        print('y=',y[i])
-    y = -1*np.array(y)
-    x = np.array(x)
-    r0, dr, offset = rot_fit_2(x,y)
-    yield from bps.mov(zps.zpsth, orig_th)
-    dx = -dr*np.sin(offset*np.pi/180)/1000.0
-    dz = -dr*np.cos(offset*np.pi/180)/1000.0
-
-    print('dx=',dx,'   ', 'dz=',dz)
-
-    if move_flag:
-        yield from bps.movr(zps.smarx, dx)
-        yield from bps.movr(zps.smarz, dz)
-
-
-    return x,y
 
 def zp_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time, 
-                     elem='Pt_L', threshold = 0.5, neg_flag = 0, move_flag=0):
+                     elem='Pt_L', threshold = 0.5, neg_flag = 0, edge_flag = 0, move_flag=0, use_x_only = False):
 
     """
     <zp_rot_alignment(-30,30,5, -10, 10, 200, 0.03, 'Ni', 0.1)
@@ -792,10 +760,13 @@ def zp_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time,
         x[i] = a_start + i*a_step
         yield from bps.mov(zps.zpsth, x[i])
         yield from bps.sleep(2)
-        if np.abs(x[i]) > 44.99:
+        if np.abs(x[i]) > 44.99 and not use_x_only:
             yield from fly1dpd(dets_fast_fs,zpssz,start,end,num,acq_time)
             yield from bps.sleep(0.5)
-            tmp = return_line_center(-1, elem=elem,threshold=threshold,neg_flag=neg_flag)
+            if edge_flag:
+                tmp,_ = erf_fit(-1, elem, show_figure=False)
+            else:
+                tmp = return_line_center(-1, elem=elem,threshold=threshold,neg_flag=neg_flag)
             points,fluo = get_fluo_data(-1,elem)
             points*= np.sin(x[i]*np.pi/180.0)
             #tmp = return_tip_pos(-1, elem=elem)
@@ -804,7 +775,10 @@ def zp_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time,
         else:
             yield from fly1dpd(dets_fast_fs,zpssx,start,end,num,acq_time)
             yield from bps.sleep(0.5)
-            tmp = return_line_center(-1,elem=elem,threshold=threshold,neg_flag=neg_flag )
+            if edge_flag:
+                tmp,_ = erf_fit(-1, elem, show_figure=False)
+            else:
+                tmp = return_line_center(-1, elem=elem,threshold=threshold,neg_flag=neg_flag)
             points,fluo = get_fluo_data(-1,elem)
             points*= np.cos(x[i]*np.pi/180.0)
             #tmp = return_tip_pos(-1, elem=elem)
@@ -816,21 +790,121 @@ def zp_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time,
     y = -1*np.array(y)
     x = np.array(x)
     r0, dr, offset = rot_fit_2(x,y)
-    yield from bps.mov(zps.zpsth, orig_th)
     dx = -dr*np.sin(offset*np.pi/180)
     dz = -dr*np.cos(offset*np.pi/180)
 
     print(f'{dx = :.4f} um,   {dz = :.4f} um')
 
     print(f'MOVE relative: smarx = {dx :.1f} um, smarz = {dz :.1f} um')
-    print('Optional move relative: zpsx %.4f mm, zpsz %.4f mm'%(-r0/1000,-dz))
+    print('Optional move relative: zpsx %.4f mm, zpsz %.4f mm'%(-r0/1000,-dz/1000))
 
+    yield from bps.mov(zps.zpsth, orig_th)
+    
     if move_flag:
         yield from bps.movr(zps.smarx, dx*1000)
         yield from bps.movr(zps.smarz, dz*1000)
 
 
     # return dx,dz
+
+def get_zp_rot_alignment_result(scans, elem='Pt_L', threshold=0.5,
+                            neg_flag=0, edge_flag=0, skip_scans=None, plot_flag=True):
+    """
+    Compute dx and dz from rotation alignment scans.
+    Supports relative scan numbers (e.g., -10 means scans [-10 ... -1]).
+
+    Parameters
+    ----------
+    scans : list[int] or int
+        - List of scan numbers, e.g. [401, 402, 403]
+        - Or a single negative integer, e.g. -10, meaning [-10, -9, ..., -1]
+    elem : str
+        Element line to analyze.
+    threshold, neg_flag, edge_flag : analysis parameters.
+    skip_scans : list[int], optional
+        List of scan numbers to skip.
+    plot_flag : bool
+        If True, show plots.
+
+    Returns
+    -------
+    dx, dz : tuple of float
+        Calculated alignment offsets (µm).
+    """
+
+    # --- interpret scans ---
+    if isinstance(scans, int):
+        if scans < 0:
+            scan_numbers = list(range(scans, 0))  # e.g. -10 -> [-10, -9, ..., -1]
+        else:
+            scan_numbers = [scans]
+    else:
+        scan_numbers = list(scans)
+
+    if skip_scans is None:
+        skip_scans = []
+
+    used_scans = [s for s in scan_numbers if s not in skip_scans]
+
+    if len(used_scans) < 3:
+        raise ValueError("Need at least 3 valid scans to fit rotation alignment.")
+
+    x = []
+    y = []
+
+    if plot_flag:
+        fig, ax = plt.subplots()
+        ax.set_title(f"Rotation alignment (elem={elem})")
+        ax.set_xlabel("Position (µm)")
+        ax.set_ylabel(f"{elem} fluorescence (a.u.)")
+
+    for sn in used_scans:
+        # Get rotation angle from scan metadata or naming convention
+        h = db[sn]
+        angle = h.table("baseline")['zpsth'].values[0]
+        #angle = get_scan_angle(sn)  # user-defined helper
+
+        # Extract fluorescence data and compute y-value
+        if edge_flag:
+            tmp, _ = erf_fit(sn, elem)
+        else:
+            tmp = return_line_center(sn, elem=elem, threshold=threshold, neg_flag=neg_flag)
+
+        points, fluo = get_fluo_data(sn, elem)
+        points = np.array(points)
+        fluo = np.array(fluo)
+
+        proj = np.sin(np.deg2rad(angle)) if np.abs(angle) > 44.99 else np.cos(np.deg2rad(angle))
+        y_val = tmp * proj
+
+        x.append(angle)
+        y.append(y_val)
+
+        if plot_flag:
+            ax.plot(points * proj, fluo, label=f"Scan {sn} (θ={angle:.1f}°)")
+
+    x = np.array(x)
+    y = -1 * np.array(y)
+
+    r0, dr, offset = rot_fit_2(x, y)
+
+    dx = -dr * np.sin(np.deg2rad(offset))
+    dz = -dr * np.cos(np.deg2rad(offset))
+
+    print(f"\nResults based on scans {used_scans}:")
+    print(f"  dx = {dx:.4f} µm")
+    print(f"  dz = {dz:.4f} µm")
+    print(f"  r0 = {r0:.4f}, offset = {offset:.2f}°")
+
+    if plot_flag:
+        ax.legend()
+        plt.show()
+
+    return dx, dz
+
+def apply_zp_rot_algn_corr(dx, dz):
+
+    yield from bps.movr(smarx, dx, smarz, dz, zps.zpsx, -0.001*dx)
 
 
 def zp_rot_scan(a_start, a_end, a_num, start, end, num, acq_time, 
@@ -881,7 +955,7 @@ def zp_rot_scan(a_start, a_end, a_num, start, end, num, acq_time,
     print(f'{dx = :.4f} um,   {dz = :.4f} um')
 
     print(f'MOVE relative: smarx = {dx :.1f} um, smarz = {dz :.1f} um')
-    print('Optional move relative: zpsx %.4f mm, zpsz %.4f mm'%(-r0/1000,-dz))
+    print('Optional move relative: zpsx %.4f mm, zpsz %.4f mm'%(-r0/1000,-dz/1000))
 
     if move_flag:
         yield from bps.movr(zps.smarx, dx*1000)
@@ -1383,7 +1457,60 @@ def wh_diff(scanid = None):
     print(f'{Gamma = :.2f}, {Delta  = :.2f} , r = {R_det :.2f}')
     return Gamma, Delta, R_det
 
+def get_diff_det_params(sid):#,export_folder):
+    # save baseline, detector angle and roi setting for a scan
+    bl = db[sid].table('baseline')
 
+    diff_z = np.array(bl['diff_z'])[0]
+    diff_yaw = np.array(bl['diff_yaw'])[0] * np.pi / 180.0
+    diff_cz = np.array(bl['diff_cz'])[0]
+    diff_x = np.array(bl['diff_x'])[0]
+    diff_y1 = np.array(bl['diff_y1'])[0]
+    diff_y2 = np.array(bl['diff_y2'])[0]
+
+
+    gamma = diff_yaw
+    beta = 89.337 * np.pi / 180
+    z_yaw = 574.668 + 581.20 + diff_z
+    z1 = 574.668 + 395.2 + diff_z
+    z2 = z1 + 380
+    d = 395.2
+
+    x_yaw = np.sin(gamma) * z_yaw / np.sin(beta + gamma)
+    R_yaw = np.sin(beta) * z_yaw / np.sin(beta + gamma)
+    R1 = R_yaw - (z_yaw - z1)
+    R2 = R_yaw - (z_yaw - z2)
+
+    if abs(x_yaw + diff_x) > 3:
+        gamma = 0
+        delta = 0
+        #R_det = 500
+
+        beta = 89.337 * np.pi / 180
+        R_yaw = np.sin(beta) * z_yaw / np.sin(beta + gamma)
+        R1 = R_yaw - (z_yaw - z1)
+        R_det = R1 / np.cos(delta) - d + diff_cz
+
+    elif abs(diff_y1 / R1 - diff_y2 / R2) > 0.01:
+        gamma = 0
+        delta = 0
+        #R_det = 500
+
+        beta = 89.337 * np.pi / 180
+        R_yaw = np.sin(beta) * z_yaw / np.sin(beta + gamma)
+        R1 = R_yaw - (z_yaw - z1)
+        R_det = R1 / np.cos(delta) - d + diff_cz
+
+    else:
+        delta = np.arctan(diff_y1 / R1)
+        R_det = R1 / np.cos(delta) - d + diff_cz
+
+    
+
+    print('gamma, delta, dist:', gamma*180/np.pi, delta*180/np.pi, R_det)
+
+    return bl['energy'][1], gamma*180/np.pi, delta*180/np.pi, R_det*1000
+    
 def diff_status():
 
     if diff.yaw.position>0.5:
@@ -1779,10 +1906,11 @@ def find_45_offset(data_path = "/nsls2/data/hxn/legacy/users/Beamline_Performanc
     return optimal_offset
 
 
-def find_45_degree_fullrange(th_mtr,start_angle,end_angle,angle_step, x_start, x_end, x_num, exp_time=0.02, elem="Pt_L"):
+def rot_stage_calib_scan(th_mtr,start_angle,end_angle,angle_step, x_start, x_end, x_num, exp_time=0.02, elem="Pt_L"):
 
 
     ''' Usage: find_45_degree_fullrange(zpsth,-5,5,3,-12, 12,200, exp_time=0.03,elem="Au_L") '''
+    print("Diving board line of 5 um is assumed in the fitting")
     
     time_ = datetime.now().strftime("%Y%m%d_%H%M%S")
     save_name = f"find_45_{th_mtr.name}_{start_angle}_to_{end_angle}_{time_}"
@@ -1819,10 +1947,53 @@ def find_45_degree_fullrange(th_mtr,start_angle,end_angle,angle_step, x_start, x
         th[i]=th_mtr.position
         yield from bps.sleep(1)
         
-        np.savetxt(f"/nsls2/data/hxn/legacy/users/Beamline_Performance/find_45_scans/{save_name}.txt",
-                   np.column_stack([np.array(scan_motor),th,w_x,x_sid]), header = header, fmt = '%s')
+        save_file = f"/nsls2/data/hxn/legacy/users/Beamline_Performance/find_45_scans/{save_name}.txt"
+        np.savetxt(save_file, np.column_stack([np.array(scan_motor),th,w_x,x_sid]), header = header, fmt = '%s')
+    
+    ############### added for fitting ##############
+    data = np.genfromtxt(
+        save_file,
+        skip_header=1,          # skip the column headers
+        dtype=None,             # let numpy guess types (object array)
+        encoding="utf-8"        # needed for Python 3 to handle strings
+    )
+    motor = data["f0"]
+    th = np.deg2rad(data["f1"])
+    w = data["f2"]
+
+    popt, pcov = curve_fit(
+        lambda x, sx, sz, b, c: xz_fitting(x, motor, sx, sz, b, c),
+        th, w,
+        p0=[1, 1, 0.01, 0.01],
+        bounds=([0, 0, -np.pi, -np.pi], [np.inf, np.inf, np.pi, np.pi])
+    )
+    sx_fit,sz_fit,b_fit, c_fit = popt
+    fit_y = xz_fitting(th, motor, sx_fit,sz_fit,b_fit, c_fit)
+    plt.figure()
+    plt.plot(np.rad2deg(th),w,'b.', np.rad2deg(th),fit_y,'r-')
+    plt.show(block=False)
+    plt.title(f"sx = {sx_fit:.3f}, sz = {sz_fit:.3f}, line offset = {np.rad2deg(b_fit):.3f}, stage offset = {np.rad2deg(c_fit):.3f}")
+    plt.xlabel('th')
+    print(f"sx = {sx_fit:.3f}, sz = {sz_fit:.3f}, line offset = {b_fit:.3f}, stage offset = {c_fit:.3f}")
 
     return th,w_x
+
+# Define the model function to fit the width of diving board line
+def x_fitting(x, sx, b, c):
+    return sx*5.0* np.cos(x + b) / np.cos(x + c)
+def z_fitting(x, sz, b, c):
+    return sz*5.0* np.cos(x + b) / np.abs(np.sin(x + c))
+
+def xz_fitting(x, motor,sx, sz,  b, c):
+    out = np.empty_like(x,dtype=float)
+    if "zpssx" in motor or "zpssz" in motor:
+        out[motor == 'zpssz'] = z_fitting(x[motor=='zpssz'], sz, b, c)
+        out[motor == 'zpssx'] = x_fitting(x[motor=='zpssx'], sx, b, c)
+    elif "dssx" in motor or "zdssz" in motor:
+        out[motor == 'dssz'] = z_fitting(x[motor=='dssz'], sz, b, c)
+        out[motor == 'dssx'] = x_fitting(x[motor=='dssx'], sx, b, c)
+    return out
+
 
 def find_45_offset_scaling(data_path = "/nsls2/data/hxn/legacy/users/Beamline_Performance/45deg_calib.txt"):
 
@@ -2513,21 +2684,43 @@ def zp_to_cam11_view():
         caput("XF:03IDC-ES{ANC350:8-Ax:1}Mtr.VAL", zp_bsx_pos+100)
 
 
-def zp_bs_out(wait_till_finish = True):
+def zp_bs_out():
 
-    if abs(mllbs.bsx.position)<10 and abs(mllbs.bsy.position)<10:
+    if abs(zpbs.zpbsx.position)<10 and abs(zpbs.zpbsy.position)<10:
 
-        caput(mllbs.bsx.prefix,caget(mllbs.bsx.prefix)+500)
-        caput(mllbs.bsy.prefix,caget(mllbs.bsy.prefix)-500)
-        if wait_till_finish:
-            while mllbs.bsx.moving or mllbs.bsy.moving:
-                time.sleep(0.3)
+        yield from bps.movr(zpbs.zpbsy, 100)
         
     else:
         raise ValueError(f"bemastop positions are not close to zero."
-                        f"bsx = {mllbs.bsx.position :.1f},bsy = {mllbs.bsy.position :.1f}")
-    
+                        f"bsy = {zpbs.zpbsx.position :.1f}")
 
+def zp_bs_in():
+
+    if abs(zpbs.zpbsy.position)>80:
+
+        yield from bps.movr(zpbs.zpbsy, -100)
+        
+    else:
+        raise ValueError(f"bemastop positions are close to out position."
+                        f"bsy = {zpbs.zpbsx.position :.1f}")
+    
+def zp_osa_out():
+    curr_pos = zposa.zposay.position
+    if curr_pos >2000:
+        raise ValueError('OSAY is out of IN range')
+    else:
+        # qmsg = QMessageBox.information(self, "info","OSAY is moving")
+        # qmsg.setAutoClose(True)
+        # qmsg.exec()
+        yield from bps.movr(zposa.zposay, +2700)
+
+
+def zp_osa_in():
+    curr_pos = zposa.zposay.position
+    if curr_pos < 2000:
+        raise ValueError('OSAY is already close to IN position')
+    else:
+        yield from bps.movr(zposa.zposay, -2700)
 
 def stop_all_mll_motion():
     hmll.stop()
@@ -2902,16 +3095,20 @@ def recover_from_beamdump(peak_after = True):
 
         yield from peak_the_flux()
 
+def calc_zpz_with_energy(energy=9):
 
-
-def move_zpz_with_energy(energy=9, move_zpz1 = False):
-
-    ref_energy = 12
-    ref_zpz1 = -26.749
+    ref_energy = 9
+    ref_zpz1 = -8.205
     per_ev_corr = 6.093
 
     calc_zpz1 = ref_zpz1 +((ref_energy-energy)* per_ev_corr)
 
+    return calc_zpz1
+
+
+def move_zpz_with_energy(energy=9, move_zpz1 = False):
+
+    calc_zpz1 = calc_zpz_with_energy(energy)
 
     print(f"Estimated ZPZ1 position = {calc_zpz1 :.3f}")
 
@@ -2950,12 +3147,12 @@ def piezos_to_zero(zp_flag = True):
         yield from bps.mov(dssx,0,dssy,0,dssz,0)   
 
 def cam06_in():
-
+    yield from bps.sleep(1)
     caput('XF:03IDC-OP{Stg:CAM6-Ax:X}Mtr.VAL', 0)
     caput('XF:03IDC-OP{Stg:CAM6-Ax:Y}Mtr.VAL', 0)
 
 def cam06_out():
-
+    yield from bps.sleep(1)
     caput('XF:03IDC-OP{Stg:CAM6-Ax:X}Mtr.VAL', -60)
     caput('XF:03IDC-OP{Stg:CAM6-Ax:Y}Mtr.VAL', 0)
 
@@ -2964,6 +3161,16 @@ def cam06_laser_in():
     caput('XF:03IDC-OP{Stg:CAM6-Ax:X}Mtr.VAL', -32.5)
     caput('XF:03IDC-OP{Stg:CAM6-Ax:Y}Mtr.VAL', 1.5)
 
+
+
+
+def move_xrf_det(taret_pos):
+    yield from bps.mov(fdet1.x, taret_pos)
+
+def xrf_det_out():
+    """Returns a plan to move the XRF detector to -107."""
+    # Returns a NEW generator plan every time it is called
+    return move_xrf_det(-107)
 
 # Function to move the motor forward and backward
 def test_motor_motion(motor, move_percent = 1):
@@ -3007,16 +3214,35 @@ def test_all_critical_motors(check_list = ['diff','ssa2','s5','fdet1', 'm2', 'm1
         yield   from test_all_child_motors(parent_name = parent, 
                                            move_percent = 1)
 
+def move_cam6(x = 0, y = 0):
+
+    yield from bps.mov(cam6.x, x, cam6.y , y)
+
+def cam6_out():
+    return move_cam6(x = -60, y = 0)
+
+def cam6_in():
+    return move_cam6(x = 0, y = 0)
+
+def cam6_to_laser():
+    return move_cam6(x = -35.25, y = 0.45)
 
 
+def move_fs1_y(target_pos):
+    yield from bps.mov(fs1_y, target_pos)
 
+def fs_out():
+    """Move fs1_y out to -20."""
+    # This function returns a NEW generator plan when called
+    return move_fs1_y(-20)
 
+def fs_in():
+    """Move fs1_y in to -57."""
+    # This function returns a NEW generator plan when called
+    return move_fs1_y(-57)
 
-
-
-
-
-
+def move_dexela(x = 0, y = 0):
+    yield from bps.mov(dexela.x, x, dexela.y , y)
 
 
 

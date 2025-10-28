@@ -42,6 +42,9 @@ class HxnSlowShutter(HxnModalBase, Device):
 
 bshutter = HxnSlowShutter('XF:03IDB-PPS{PSh}Cmd', name = 'bshutter')
 
+
+
+
 class HxnSSAperture(MotorBundle):
     hgap = Cpt(EpicsMotor, '-Ax:XAp}Mtr')
     vgap = Cpt(EpicsMotor, '-Ax:YAp}Mtr')
@@ -129,6 +132,12 @@ fdet2 = HxnDetectorPositioner('XF:03IDC-ES{Det:Bruk', name='fdet2')
 
 bs_x = EpicsMotor('XF:03IDC-ES{MC:12-Ax:4}Mtr', name='bs_x')
 bs_y = EpicsMotor('XF:03IDC-ES{MC:12-Ax:5}Mtr', name='bs_y')
+
+
+difftrans_x = EpicsMotor('XF:03IDC-ES{MC:14-Ax:1}Mtr', name='DiffTransX')
+difftrans_y = EpicsMotor('XF:03IDC-ES{MC:14-Ax:2}Mtr', name='DiffTransY')
+difftrans_z = EpicsMotor('XF:03IDC-ES{MC:14-Ax:3}Mtr', name='DiffTransZ')
+
 
 mc12 = HxnTurboPmacController('XF:03IDC-ES{MC:12', name='mc12')
 

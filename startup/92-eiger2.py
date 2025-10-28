@@ -318,6 +318,7 @@ class HXNEiger(EigerSingleTriggerV33, EigerDetector):
     #stats5 = Cpt(StatsPluginHXN, 'Stats5:')
     proc1 = Cpt(ProcessPlugin, 'Proc1:')
     transform1 = Cpt(TransformPlugin, 'Trans1:')
+    image1 = Cpt(ImagePlugin, 'image1:')
 
     roi1 = Cpt(ROIPlugin, 'ROI1:')
     roi2 = Cpt(ROIPlugin, 'ROI2:')

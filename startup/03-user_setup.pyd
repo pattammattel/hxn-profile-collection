@@ -1,0 +1,276 @@
+#print(f"Loading {__file__!r} ...")
+import httpx
+import subprocess
+import os
+import json 
+
+def get_proposal_info(proposal_id):
+    """
+    Fetch detailed proposal info from the NSLS-II API using httpx.
+
+    Parameters
+    ----------
+    proposal_id : str or int
+        NSLS-II proposal number (e.g., 300001)
+
+    Returns
+    -------
+    dict
+        Example:
+        {
+            "proposal_id": "300001",
+            "title": "Study of Sample Dynamics Using X-ray Techniques",
+            "cycle": "2025-3",
+            "pi_lastname": "Doe",
+            "users": [
+                {"name": "Jane Doe", "username": "jdoe"},
+                {"name": "John Smith", "username": "jsmith"},
+                {"name": "Alex Brown", "username": "abrown"}
+            ]
+        }
+    """
+    base_url = "https://api.nsls2.bnl.gov/v1"
+    proposal_url = f"{base_url}/proposal/{proposal_id}"
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            # --- Fetch proposal info ---
+            r = client.get(proposal_url)
+            r.raise_for_status()
+            proposal_data = r.json().get("proposal", {})
+
+            users = proposal_data.get("users", [])
+            cycles = proposal_data.get("cycles", [])
+            title = proposal_data.get("title", "Unknown Title")
+
+            # --- Extract PI and user info ---
+            pi_lastname = None
+            user_list = []
+            for user in users:
+                name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+                username = user.get("username", "")
+                user_list.append({"name": name, "username": username})
+                if user.get("is_pi"):
+                    pi_lastname = user.get("last_name")
+
+            # --- Determine cycle ---
+            if cycles:
+                current_cycle = cycles[0]
+            else:
+                try:
+                    cycle_r = client.get(f"{base_url}/facility/nsls2/cycles/current")
+                    cycle_r.raise_for_status()
+                    current_cycle = cycle_r.json().get("cycle", "Unknown")
+                except httpx.RequestError:
+                    current_cycle = "Unknown"
+
+    except httpx.RequestError as e:
+        print(f"Failed to fetch proposal info: {e}")
+        return None
+
+    return {
+        "proposal_id": str(proposal_id),
+        "title": title,
+        "cycle": current_cycle,
+        "pi_lastname": pi_lastname,
+        "users": user_list
+    }
+
+def create_local_user_dir(pi_lastname: str, cycle: str):
+    """
+    Create a user data directory based on PI last name and beamline cycle.
+
+    Directory structure:
+        /data/users/<cycle>/<pi_lastname>-<cycle>/
+
+    Parameters
+    ----------
+    pi_lastname : str
+        PI's last name (used in directory name)
+    cycle : str
+        Beamline cycle in the format 'YYYY-N' (e.g. '2025-3')
+
+    Returns
+    -------
+    str
+        Full path to the created or existing user directory.
+    """
+
+    # Validate cycle format
+    if '-' not in cycle:
+        raise ValueError("Cycle format must be 'YYYY-N' (e.g., '2025-3')")
+
+    # Build directory names
+    user_cycle = f"{pi_lastname}-{cycle}"
+    dir_name = f"/nsls2/data/hxn/legacy/users/{cycle}/{user_cycle}"
+
+    # Create directory if missing
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name, exist_ok=True)
+        print(f"✅ Created user directory: {dir_name}")
+    else:
+        print(f"ℹ️  User directory exists: {dir_name}")
+
+    return dir_name
+
+
+def create_user_dir_from_proposal(proposal_id):
+    """
+    Fetch proposal info and create a local user directory based on the
+    PI last name and cycle using create_local_user_dir().
+
+    Also saves the proposal info into a JSON file inside that directory.
+
+    Directory structure:
+        /data/users/<cycle>/<pi_lastname>-<cycle>/
+            └── proposal_info.json
+
+    Parameters
+    ----------
+    proposal_id : str or int
+        NSLS-II proposal number (e.g., 312345)
+
+    Returns
+    -------
+    str or None
+        Full path to the created or existing user directory.
+        Returns None if proposal info cannot be retrieved.
+    """
+
+    # --- Fetch proposal info ---
+    info = get_proposal_info(proposal_id)
+    if not info:
+        print(f" Could not fetch proposal info for ID {proposal_id}")
+        return None
+
+    pi_lastname = info.get("pi_lastname")
+    cycle = info.get("cycle")
+
+    # --- Validate required info ---
+    if not pi_lastname or not cycle:
+        print(f" Missing PI or cycle info in proposal {proposal_id}")
+        return None
+
+    # --- Create the local directory ---
+    dir_path = create_local_user_dir(pi_lastname, cycle)
+    print(f" Local user directory ready for proposal {proposal_id}: {dir_path}")
+
+    # --- Save proposal info JSON ---
+    json_path = os.path.join(dir_path, "proposal_info.json")
+    try:
+        with open(json_path, "w") as f:
+            json.dump(info, f, indent=4)
+        print(f" Saved proposal info to: {json_path}")
+    except Exception as e:
+        print(f" Failed to write proposal_info.json: {e}")
+
+    return dir_path
+
+
+
+def get_proposal_paths(proposal_id):
+    """
+    Return the local and proposal data paths for a given NSLS-II proposal ID.
+
+    Directory structure:
+        Local:    /data/users/<cycle>/<pi_lastname>-<cycle>/
+        Proposal: /nsls2/data/hxn/proposals/<cycle>/pass-<proposal_id>/
+
+    Parameters
+    ----------
+    proposal_id : str or int
+        NSLS-II proposal number (e.g., 312345)
+
+    Returns
+    -------
+    tuple or None
+        (local_path, proposal_path)
+        Returns None if proposal info could not be fetched or is incomplete.
+    """
+
+    info = get_proposal_info(proposal_id)
+    if not info:
+        return None
+
+    pi_lastname = info.get("pi_lastname")
+    cycle = info.get("cycle")
+
+    if not pi_lastname or not cycle:
+        return None
+
+    local_path = create_local_user_dir(pi_lastname, cycle)
+    proposal_path = f"/nsls2/data/hxn/proposals/{cycle}/pass-{proposal_id}"
+
+    return local_path, proposal_path
+
+
+def open_gnome_terminal_su_copy(src_dir: str, dst_dir: str):
+    """
+    Open a GNOME terminal that asks for username using 'su',
+    then runs rsync to copy data from src_dir → dst_dir.
+    DUO push and password handled in terminal.
+    """
+
+    rsync_cmd = f"rsync -avh --progress '{src_dir}' '{dst_dir}'"
+
+    shell_script = (
+        "echo '---------------------------------------'; "
+        "echo ' HXN Data Copy Utility '; "
+        "echo '---------------------------------------'; "
+        "echo; "
+        "read -p 'Enter your NSLS-II username: ' uname; "
+        "echo; "
+        "echo 'Logging in as $uname (DUO push may be required)...'; "
+        f"su - $uname -c \"{rsync_cmd}\"; "
+        "echo; "
+        "echo '✅ Copy finished (or cancelled).'; "
+        "echo 'Press Enter to close this window.'; "
+        "read"
+    )
+
+    gnome_cmd = [
+        "gnome-terminal",
+        "--",
+        "bash",
+        "-c",
+        shell_script
+    ]
+
+    try:
+        subprocess.Popen(gnome_cmd)
+        print(f"\n🖥️  A GNOME terminal has opened.")
+        print(f"   From: {src_dir}")
+        print(f"   To:   {dst_dir}")
+        print("   Log in to complete the copy (DUO will push automatically).\n")
+    except Exception as e:
+        print(f"❌ Failed to open GNOME terminal:\n{e}")
+
+
+def copy_data_from_proposal(proposal_id):
+    """
+    Copy user data for a given proposal to its official proposal directory.
+
+    Uses:
+      - get_proposal_paths() → to resolve local and proposal paths
+      - open_gnome_terminal_su_copy() → to perform the rsync copy in a new GNOME terminal
+
+    Parameters
+    ----------
+    proposal_id : str or int
+        NSLS-II proposal number (e.g., 312345)
+    """
+
+    # --- Get source and destination paths ---
+    paths = get_proposal_paths(proposal_id)
+    if not paths:
+        print(f"❌ Could not determine paths for proposal {proposal_id}")
+        return
+
+    local_path, proposal_path = paths
+
+    print(f"📂 Preparing to copy data for proposal {proposal_id}:")
+    print(f"   From: {local_path}")
+    print(f"   To:   {proposal_path}\n")
+
+    # --- Launch the interactive rsync copy ---
+    open_gnome_terminal_su_copy(local_path, proposal_path)

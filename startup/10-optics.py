@@ -161,11 +161,13 @@ class HxnXYPitchPositioner(MotorBundle):
     p = Cpt(EpicsMotor, '-Ax:P}Mtr')
 
 
+cam6 = HxnXYPositioner('XF:03IDC-OP{Stg:CAM6', name='cam6')
+dexela = HxnXYPositioner('XF:03IDC-ES{Stg:FPDet', name='cam6')
+fs1_y = EpicsMotor('XF:03IDA-OP{FS:1-Ax:Y}Mtr', name='fs1_y')
+
 bpm1 = HxnXYPositioner('XF:03IDA-OP{BPM:1', name='bpm1')
 bpm2 = HxnXYPositioner('XF:03IDA-OP{BPM:2', name='bpm2')
-
 bpm3_x = EpicsMotor('XF:03IDA-OP{BPM:3-Ax:X}Mtr', name='bpm3_x')
-fs1_y = EpicsMotor('XF:03IDA-OP{FS:1-Ax:Y}Mtr', name='fs1_y')
 bpm4_y = EpicsMotor('XF:03IDA-OP{BPM:4-Ax:Y}Mtr', name='bpm4_y')
 bpm5_y = EpicsMotor('XF:03IDA-OP{BPM:5-Ax:Y}Mtr', name='bpm5_y')
 

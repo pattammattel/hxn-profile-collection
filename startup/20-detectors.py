@@ -3,6 +3,17 @@ print(f"Loading {__file__!r} ...")
 from ophyd import (EpicsSignal, EpicsSignalRO)
 from ophyd import (Device, Component as Cpt)
 
+from ophyd.areadetector import (AreaDetector, PixiradDetectorCam, ImagePlugin,
+                                TIFFPlugin, StatsPlugin, HDF5Plugin,
+                                ProcessPlugin, ROIPlugin, TransformPlugin,
+                                OverlayPlugin)
+from ophyd.areadetector.base import ADComponent, EpicsSignalWithRBV
+
+from ophyd import CamBase
+
+from ophyd.areadetector.cam import AreaDetectorCam
+
+
 import hxntools.handlers
 from hxntools.detectors import (HxnTimepixDetector as _HTD,
                                 HxnMerlinDetector as _HMD,
@@ -14,6 +25,7 @@ from hxntools.detectors.merlin import HDF5PluginWithFileStore as _mhdf
 from hxntools.detectors.zebra import HxnZebra
 
 from nslsii.ad33 import (SingleTriggerV33, StatsPluginV33, CamV33Mixin)
+
 
 
 # - 2D pixel array detectors
@@ -88,7 +100,21 @@ merlin2.hdf5.stage_sigs.update([(merlin2.hdf5.compression,'szip')])
 merlin2.ensure_nonblocking()
 
 # -- Dexela 1 (Dexela 1512 GigE-V24)
+class DexelaDetectorCam(CamBase):
+    pass
+
+
+class HxnDexelaDetector(AreaDetector):
+    cam = Cpt(DexelaDetectorCam, 'cam1:')
+    proc1 = Cpt(ProcessPlugin, 'Proc1:')
+    transform1 = Cpt(TransformPlugin, 'Trans1:')
+    image1 = Cpt(ImagePlugin, 'image1:')
+
+
+dexela1 = HxnDexelaDetector('XF:03IDC-ES{Dexela:1}', name='dexela1')
 '''
+
+
 class HxnDexelaDetector(_HDD):
     hdf5 = Cpt(_dhdf, 'HDF1:',
                read_attrs=[],

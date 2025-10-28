@@ -777,8 +777,8 @@ def zp_tomo_scan_aligned(angle_start, angle_end, angle_step, x_start, x_end, x_n
     # x_scale_factor = 0.9542
     # z_scale_factor = 1.0309
 
-    x_scale_factor = abs(motor_table['zpssx'][1] * 1.e4)
-    z_scale_factor = abs(motor_table['zpssz'][1] * 1.e4)
+    x_scale_factor = 1
+    z_scale_factor = 1
 
     if ic_0 is None:
         ic_0 = sclr2_ch2.get()
@@ -1139,8 +1139,8 @@ def zp_tomo_scan_scale(angle_start, angle_end, angle_num, x_start, x_end, x_num,
         # x_scale_factor = 0.9542
         # z_scale_factor = 1.0309
 
-        x_scale_factor = abs(motor_table['zpssx'][1] * 1.e4)
-        z_scale_factor = abs(motor_table['zpssz'][1] * 1.e4)
+        x_scale_factor = 1
+        z_scale_factor = 1
 
         angle_offset = 0. #-2.18
 
@@ -3542,7 +3542,7 @@ def recover_and_scan(sid, dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s, mot2
     yield from recover_zp_scan_pos(int(sid),moveZP,1)
     yield from bps.sleep(3)
     yield from check_for_beam_dump(threshold = 5000)
-    yield from fly2d(dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s, mot2_e, mot2_n, exp_t)
+    yield from fly2dpd(dets_fast, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s, mot2_e, mot2_n, exp_t)
     yield from bps.sleep(3)
     yield from bps.mov(zpssx,0,zpssy,0)
     yield from bps.sleep(3)
@@ -3886,8 +3886,8 @@ def mosaic_overlap_scan(dets = None, ylen = 100, xlen = 100, overlap_per = 15, d
     X_position = np.linspace(0,xlen_updated-scan_dim,x_tile)
     Y_position = np.linspace(0,ylen_updated-scan_dim,y_tile)
 
-    X_position_abs = smarx.position*1000+(X_position)
-    Y_position_abs = smary.position*1000+(Y_position)
+    X_position_abs = smarx.position+(X_position)
+    Y_position_abs = smary.position+(Y_position)
 
     #print(X_position_abs)
     #print(Y_position_abs)
@@ -3934,10 +3934,10 @@ def mosaic_overlap_scan(dets = None, ylen = 100, xlen = 100, overlap_per = 15, d
 
 
         else:
-            yield from bps.movr(smary, ylen_updated*-0.001/2)
-            yield from bps.movr(smarx, xlen_updated*-0.001/2)
-            X_position_abs = smarx.position+(X_position*0.001)
-            Y_position_abs = smary.position+(Y_position*0.001)
+            yield from bps.movr(smary, ylen_updated/-2)
+            yield from bps.movr(smarx, xlen_updated/-2)
+            X_position_abs = smarx.position+(X_position)
+            Y_position_abs = smary.position+(Y_position)
 
             print(X_position_abs)
             print(Y_position_abs)
