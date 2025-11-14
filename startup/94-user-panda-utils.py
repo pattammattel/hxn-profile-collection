@@ -202,7 +202,7 @@ class PandaLivePlot():
 
         for r in self.xsp.enabled_rois:
             for i in range(self.ntotal):
-                if live_plot_elems[i].startswith('sclr'):
+                if live_plot_elems[i].startswith('sclr') and len(self.elems[i]) == 0:
                     match = re.search(r'sclr(\d+)_ch(\d+)',live_plot_elems[i])
                     ch_num = int(match.group(2))
                     self.elems[i].append(sclr.mca_by_index[ch_num])

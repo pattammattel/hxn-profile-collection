@@ -3856,10 +3856,13 @@ def plot_data(sid = -1,  elem = 'Pt_L', mon = 'sclr1_ch4'):
 
 
 def mosaic_overlap_scan(dets = None, ylen = 100, xlen = 100, overlap_per = 15, dwell = 0.05,
-                        step_size = 500, plot_elem = ["Cr"],mll = False):
-    
+                        step_size = 500, plot_elem = ["Cr"],mll = False, do_confirm=True):
+    """ 
+    Usage <mosaic_overlap_scan([fs, xspress3, eiger2], dwell=0.01, plot_elem=['Au_L'], mll=True)
 
-    """ Usage <mosaic_overlap_scan([fs, xspress3, eiger2], dwell=0.01, plot_elem=['Au_L'], mll=True)"""
+    Note that ylen and xlen are in the unit of um, and step_size is in the unit of nm. overlap_percentage is from 0 to 100.
+    Make sure to assign a multiple of 25 to ylen and xlen.
+    """
 
     if dets is None:
         dets = dets_fast
@@ -3874,8 +3877,8 @@ def mosaic_overlap_scan(dets = None, ylen = 100, xlen = 100, overlap_per = 15, d
 
     scan_dim = max_travel - round(max_travel*overlap_per*0.01)
 
-    x_tile = round(xlen/scan_dim)
-    y_tile = round(ylen/scan_dim)
+    x_tile = round(abs(xlen)/scan_dim)
+    y_tile = round(abs(ylen)/scan_dim)
 
     xlen_updated = scan_dim*x_tile
     ylen_updated = scan_dim*y_tile
@@ -3916,9 +3919,23 @@ def mosaic_overlap_scan(dets = None, ylen = 100, xlen = 100, overlap_per = 15, d
 
     #print(f'total time = {total_time} {unit}; 10 seconds to quit')
 
-    ask = input(f"Optimized scan x and y range = {xlen_updated} by {ylen_updated};"
-     f"\n total time = {total_time} {unit}"
-     f"\n Do you wish to continue? (y/n) ")
+    # --- Confirm or skip ---
+    if do_confirm:
+        ask = input(
+            f"Optimized scan x and y range = {xlen_updated} by {ylen_updated};"
+            f"\n total time = {total_time:.2f} {unit}"
+            f"\n Do you wish to continue? (y/n) "
+        )
+        if ask.lower() != "y":
+            print(" Scan cancelled by user.")
+            return
+    else:
+        print(
+            f"ℹ Skipping confirmation (do_confirm=False). Proceeding with scan:"
+            f" range = {xlen_updated}×{ylen_updated}, est. {total_time:.2f} {unit}"
+        )
+        ask='y'
+
 
     if ask == 'y':
 
@@ -3927,15 +3944,17 @@ def mosaic_overlap_scan(dets = None, ylen = 100, xlen = 100, overlap_per = 15, d
 
         if mll:
 
-            yield from bps.movr(dsy, ylen_updated/-2)
-            yield from bps.movr(dsx, xlen_updated/-2)
+            yield from bps.movr(dsy, ylen_updated/-2 + scan_dim/2) # Updated on Oct. 31 2025 by Take and Zirui
+            yield from bps.movr(dsx, xlen_updated/-2 + scan_dim/2) # Updated on Oct. 31 2025 by Take and Zirui
             X_position_abs = dsx.position+(X_position)
             Y_position_abs = dsy.position+(Y_position)
 
 
         else:
-            yield from bps.movr(smary, ylen_updated/-2)
-            yield from bps.movr(smarx, xlen_updated/-2)
+            # yield from bps.movr(smary, ylen_updated/-2 + scan_dim/2) # Updated on Oct. 31 2025 by Take and Zirui
+            # yield from bps.movr(smarx, xlen_updated/-2 + scan_dim/2) # Updated on Oct. 31 2025 by Take and Zirui
+            yield from bps.movr(smary, ylen_updated/-2 + scan_dim/2) # Updated on Oct. 31 2025 by Take and Zirui
+            yield from bps.movr(smarx, xlen_updated/-2 + scan_dim/2) # Updated on Oct. 31 2025 by Take and Zirui
             X_position_abs = smarx.position+(X_position)
             Y_position_abs = smary.position+(Y_position)
 
@@ -3946,7 +3965,7 @@ def mosaic_overlap_scan(dets = None, ylen = 100, xlen = 100, overlap_per = 15, d
         for i in tqdm.tqdm(Y_position_abs):
                 for j in tqdm.tqdm(X_position_abs):
                     print((i,j))
-                    #yield from check_for_beam_dump(threshold=5000)
+                    yield from check_for_beam_dump(threshold=5000)
                     yield from bps.sleep(1) #cbm catchup time
 
                     fly_dim = scan_dim/2

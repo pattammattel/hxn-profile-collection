@@ -1153,7 +1153,7 @@ def fly2dpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_start2, sca
             #     center1 = center1 + get_tomo_drift(tomo_angle)
 
 
-            range_min, range_max = -21, 21
+            range_min, range_max = -16, 16
                 
             for pos in [start1_scan, start1_scan + range1_scan, start2, start2 + range2]:
                 if pos < range_min or pos > range_max:
@@ -1250,6 +1250,10 @@ def fly2dpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_start2, sca
                     print("Motors didn't reach starting position, moving again...")
                     sl('#%djog=%f'%(m1_num,start1_scan))
                     sl('#%djog=%f'%(m2_num,start2))
+
+                    if count>50:
+                        raise ValueError("Motors failed to reach start position, exiting the plan. Check scan range.")
+                        
 
                     #may avoid when scan stucks if user had a non-zero strat position or motor is stuck 
                     #may need improvent if intial piezo positions are important  

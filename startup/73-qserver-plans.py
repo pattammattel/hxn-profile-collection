@@ -66,6 +66,7 @@ def fly2d_qserver_plan(label, dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s, 
      RE.md["scan_name"] = str(label)
      yield from fly2dpd(dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s, mot2_e, mot2_n, exp_t)
 
+
 def send_fly2d_to_queue(label, dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s, mot2_e, mot2_n, exp_t):
     det_names = [d.name for d in eval(dets)]
     RM.item_add((BPlan("fly2d_qserver_plan",
@@ -82,6 +83,143 @@ def send_fly2d_to_queue(label, dets, mot1, mot1_s, mot1_e, mot1_n, mot2, mot2_s,
             exp_t)))
     
 
+#mosaic scan to queue
+    
+def recover_pos_and_mosaic_qserver_plan(
+    label,
+    roi_positions,
+    dets=None,
+    ylen=100,
+    xlen=100,
+    overlap_per=15,
+    dwell=0.05,
+    step_size=500,
+    plot_elem=["Cr"],
+    mll=False,
+    ic1_count=55000,
+    scan_time_min=5.0,
+    do_confirm = False
+):
+    """
+    QServer plan: recover motor positions, verify beam, and run mosaic_overlap_scan.
+
+    This plan restores saved ROI positions, checks beam intensity,
+    and executes a full mosaic overlap scan.
+    """
+
+    print(f"▶ Starting recover_pos_and_mosaic_qserver_plan: {label}")
+
+    # --- Recover positions ---
+    for key, value in roi_positions.items():
+        try:
+            if key == "zp.zpz1":
+                yield from mov_zpz1(value)
+            else:
+                yield from bps.mov(eval(key), value)
+            print(f"{key} moved to {value:.3f}")
+        except Exception as exc:
+            print(f" Could not move {key} to {value:.3f}: {exc}")
+
+    # --- Beam check ---
+    yield from check_for_beam_dump(threshold=5000)
+
+    if sclr2_ch2.get() < ic1_count * 0.9:
+        print(" Flux low — performing peak_the_flux()")
+        yield from peak_the_flux()
+
+    # --- Run mosaic scan ---
+    RE.md["scan_name"] = str(label)
+    dets = dets_fast if dets is None else dets
+
+    try:
+        yield from mosaic_overlap_scan(
+            dets=dets,
+            ylen=ylen,
+            xlen=xlen,
+            overlap_per=overlap_per,
+            dwell=dwell,
+            step_size=step_size,
+            plot_elem=plot_elem,
+            mll=mll,
+            do_confirm = do_confirm
+        )
+        print(f" Completed mosaic scan: {label}")
+    except Exception as exc:
+        print(f" Error during mosaic scan: {exc}")
+
+    
+
+def send_recover_pos_and_mosaic_to_queue(
+    label,
+    roi_positions,
+    dets,
+    ylen=100,
+    xlen=100,
+    overlap_per=15,
+    dwell=0.05,
+    step_size=500,
+    plot_elem=["Cr"],
+    mll=False,
+    ic1_count=55000,
+    scan_time_min=5.0,
+    do_confirm = False):
+    
+    """
+        Submit recover_pos_and_mosaic_qserver_plan to the QServer queue.
+
+        Parameters
+        ----------
+        label : str
+            Name/label for the scan.
+        roi_positions : dict
+            Dictionary of motor positions from get_current_position().
+        dets : list or str
+            Detector list (e.g. [fs, xspress3, eiger2]).
+
+
+        roi = get_current_position(zp_flag=True)
+
+        send_recover_pos_and_mosaic_to_queue(
+            label="Pt_mosaic_1",
+            roi_positions=roi,
+            dets=[fs, xspress3, eiger2],
+            ylen=200,
+            xlen=200,
+            overlap_per=10,
+            dwell=0.03,
+            step_size=400,
+            plot_elem=["Pt_L"],
+            mll=False
+        )
+
+
+    """
+
+    # Convert detectors to names if needed
+    det_names = [d.name for d in eval(dets)] if isinstance(dets, str) else [d.name for d in dets]
+
+    # Ensure ROI positions are serializable
+    roi_serializable = {k: float(v) for k, v in roi_positions.items()}
+
+    plan = BPlan(
+        "recover_pos_and_mosaic_qserver_plan",
+        label,
+        roi_serializable,
+        det_names,
+        ylen,
+        xlen,
+        overlap_per,
+        dwell,
+        step_size,
+        plot_elem,
+        mll,
+        ic1_count,
+        scan_time_min,
+        do_confirm
+    )
+
+    RM.item_add(plan)
+    print(f" Added recovery + mosaic plan '{label}' to QServer queue.")
 
 def align_and_scan(
         dets,

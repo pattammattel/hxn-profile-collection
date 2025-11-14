@@ -421,8 +421,12 @@ def find_double_edge(xdata, ydata, size):
 def movr_zpz1(dz):
     yield from bps.movr(zp.zpz1, dz)
     #movr(zp.zpx, dz * 3.75)
+    # yield from bps.movr(zp.zpy, (-0.002)*dz) #follow the sign for corr factors
+    # yield from bps.movr(zp.zpx, dz*(0.0009795))
+
+    # For chamber at 700 mmHg
     yield from bps.movr(zp.zpy, (-0.002)*dz) #follow the sign for corr factors
-    yield from bps.movr(zp.zpx, dz*(0.0009795))
+    yield from bps.movr(zp.zpx, dz*(0.0009795+0.00036))
 
 def mov_zpz1(pos):
 
@@ -799,7 +803,7 @@ def zp_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time,
     print('Optional move relative: zpsx %.4f mm, zpsz %.4f mm'%(-r0/1000,-dz/1000))
 
     yield from bps.mov(zps.zpsth, orig_th)
-    
+
     if move_flag:
         yield from bps.movr(zps.smarx, dx*1000)
         yield from bps.movr(zps.smarz, dz*1000)
@@ -2157,15 +2161,36 @@ def feedback_auto_off(wait_time_sec = 0.5):
         time.sleep(wait_time_sec)
 
 
-def check_for_beam_dump(threshold = 5000):
+def check_for_beam_dump(
+    threshold = 5000, 
+    check_period = 60,
+    stabilization_delay = 900):
+    """
+    Waits until the beam intensity (sclr2_ch2) is above a given threshold,
+    and then waits for a stabilization period before running recovery.
 
+    Parameters:
+    -----------
+    threshold (float): The minimum acceptable beam intensity. Defaults to 5000.
+    check_period (float): The time (in seconds) to sleep between checks 
+                          while the beam is off. Defaults to 60.
+    stabilization_delay (float): The time (in seconds) to wait after the 
+                                 beam returns for stabilization. Defaults to 900 (15 min).
+    """
+    
+    # --- Beam-Off Loop ---
     while (sclr2_ch2.get() < threshold):
-        yield from bps.sleep(60)
-        print (f"IC3 is lower than {threshold}, waiting...")
-
-    #slogger.info("Beam is back. Waiting for 30 seconds to run recover protocol")
-    #yield from bps.sleep(30)
-    #yield from recover_from_beamdump()
+        print (f"Beam intensity ({sclr2_ch2.name}) is lower than {threshold}. Waiting...")
+        yield from bps.sleep(check_period)
+        
+    # # --- Beam-On Recovery ---
+    # logger.info("Beam is back. Waiting for %s seconds for system stabilization.", 
+    #             stabilization_delay)
+    # yield from bps.sleep(stabilization_delay)
+    
+    # # --- Execute Recovery Protocol ---
+    # logger.info("Stabilization complete. Running beam dump recovery protocol.")
+    # yield from recover_from_beamdump()
 
 
 def find_edge_2D(scan_id, elem, left_flag=True):

@@ -13,6 +13,8 @@ from ophyd.areadetector.filestore_mixins import FileStorePluginBase
 
 from ophyd.areadetector.plugins import HDF5Plugin
 
+import time
+
 
 class Xspress3FileStoreHXN(Xspress3FileStore):
     def read(self):
@@ -30,7 +32,7 @@ class Xspress3FileStoreHXN(Xspress3FileStore):
         # really force it to stop acquiring
         self.settings.acquire.put(0, wait=True)
 
-        total_points = self.parent.total_points.get()
+        total_points = self.parent.mode_settings.total_points.get()
         if total_points < 1:
             raise RuntimeError("You must set the total points")
         spec_per_point = self.parent.spectra_per_point.get()
@@ -71,10 +73,13 @@ class Xspress3FileStoreHXN(Xspress3FileStore):
         # this must be set after self.settings.num_images because at the Epics
         # layer  there is a helpful link that sets this equal to that (but
         # not the other way)
+        logger.debug('Stage sigs update')
         self.stage_sigs[self.num_capture] = total_capture
+        logger.debug('Stage sigs update done')
 
         # actually apply the stage_sigs
         ret = FileStorePluginBase.stage(self)
+        logger.debug('FileStorePluginBase stage done')
         #ret = super(Xspress3FileStore,self).stage()
 
         self._fn = self.file_template.get() % (self._fp,
@@ -206,13 +211,17 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
             return sts
 
         s = self.trigger_internal()  # IS IT CORRECT WAY TO TRIGGER ACQUISITION?
+        
+        while (self.settings.acquire.get() == 1):
+            time.sleep(0.5)
+
         sts._finished()
         return sts
     
         # self._spec_saved.clear()
 
         def monitor():
-            # success = self._spec_saved.wait(60)
+            success = self._spec_saved.wait(60)
             sts._finished(success=True)
 
         # hold a ref for gc reasons
