@@ -209,15 +209,21 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
         if self.mode_settings.scan_type.get() != 'step':
             sts._finished()
             return sts
-
-        s = self.trigger_internal()  # IS IT CORRECT WAY TO TRIGGER ACQUISITION?
         
-        while (self.settings.acquire.get() == 1):
-            time.sleep(0.5)
 
-        sts._finished()
-        return sts
-    
+        if self.external_trig.get():
+            self.trigger_external()
+            sts._finished()
+            return sts
+        else:
+            s = self.trigger_internal()  # IS IT CORRECT WAY TO TRIGGER ACQUISITION?
+            
+            while (self.settings.acquire.get() == 1):
+                time.sleep(0.5)
+
+            sts._finished()
+            return sts
+        
         # self._spec_saved.clear()
 
         def monitor():
