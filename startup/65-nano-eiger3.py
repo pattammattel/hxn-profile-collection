@@ -255,7 +255,7 @@ class HDF5PluginWithFileStoreEiger(HDF5Plugin_V33, EigerFileStoreHDF5):
 
 class EigerDetectorCam(AreaDetectorCam, CamV33Mixin):
     manual_trigger = ADComponent(EpicsSignalWithRBV, "ManualTrigger")  # 'Enable'/'Disable'
-    num_triggers = ADComponent(EpicsSignalWithRBV, 'NumTriggers')
+    num_triggers = ADComponent(EpicsSignalWithRBV,'NumTriggers')
     stream_enable = ADComponent(EpicsSignalWithRBV, 'StreamEnable')
     stream_decompress = ADComponent(EpicsSignalWithRBV, "StreamDecompress")
     data_source = ADComponent(EpicsSignalWithRBV, 'DataSource')
@@ -453,3 +453,10 @@ except Exception:
           end='\n\n')
     traceback.print_exc()
     print()
+
+
+eiger3_step = HxnEigerDetector('XF:03IDC-ES{Det:Eig3}', name='eiger3',
+                            image_name='eiger3',
+                            read_attrs=['hdf5', 'cam', 'stats1'])
+eiger3_step.hdf5.read_attrs = []
+eiger3_step.cam.auto_summation.set('Enable')

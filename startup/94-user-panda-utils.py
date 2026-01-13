@@ -1,6 +1,6 @@
 import re 
 
-def export_scan_header(scan_id,motorx,rangex,numx,motory,rangey,numy,detectors):
+def export_scan_header(scan_id,motorx,rangex,numx,motory,rangey,numy,angle,detectors):
     with open('/data/users/startup_parameters/scan_header.txt','w') as f:
         f.write('[scan]\n')
         f.write('scan_num = %d\n'%scan_id)
@@ -11,6 +11,7 @@ def export_scan_header(scan_id,motorx,rangex,numx,motory,rangey,numy,detectors):
         f.write('x_num = %d\n'%numx)
         f.write('y_num = %d\n'%numy)
         f.write('nz = %d\n'%(numx*numy))
+        f.write('angle = %.2f\n'%angle)
         if detectors:
             roi_start = detectors[0].roi1.min_xyz.get()
             f.write('det_roix_start = %d\n'%roi_start[0])
@@ -200,7 +201,13 @@ class PandaLivePlot():
             self.elems.append([])
             self.axs_names.append(live_plot_elems[i])
 
-        for r in self.xsp.enabled_rois:
+        if not USE_RASMI:
+            rois = self.xsp.enabled_rois
+        else:
+            # Only channel 4
+            rois = [r for r in self.xsp.enabled_rois if r.parent.name == 'xspress3_channel4_rois']
+
+        for r in rois:
             for i in range(self.ntotal):
                 if live_plot_elems[i].startswith('sclr') and len(self.elems[i]) == 0:
                     match = re.search(r'sclr(\d+)_ch(\d+)',live_plot_elems[i])

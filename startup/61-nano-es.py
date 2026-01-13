@@ -61,11 +61,39 @@ class HXN_NanoStage(Device):
 
 pt_tomo = HXN_NanoStage('XF:03IDC-ES', name='pt_tomo')
 
+class HXN_KBStage(Device):
+    hm_ry = Cpt(EpicsMotor,'{Mir:KB-Ax:1}Mtr')
+    hm_x = Cpt(EpicsMotor,'{Mir:KB-Ax:2}Mtr')
+    vm_rx = Cpt(EpicsMotor,'{Mir:KB-Ax:3}Mtr')
+    vm_z = Cpt(EpicsMotor,'{Mir:KB-Ax:4}Mtr')
+    vm_y = Cpt(EpicsMotor,'{Mir:KB-Ax:5}Mtr')
+    vm_rz = Cpt(EpicsMotor,'{Mir:KB-Ax:6}Mtr')
+
+    hpitch_coarse = Cpt(EpicsMotor,'{Mir:KBh-Ax:fp}Mtr')
+    hvitch_coarse = Cpt(EpicsMotor,'{Mir:KBv-Ax:fp}Mtr')
+
+kb_stage = HXN_KBStage('XF:03IDC-ES', name='kb_stage')
+
 # Temporary disable a motor (e.g. if the motor is not functioning and PVs are not accessible)
 setattr(pt_tomo.ssx, "is_disabled", False)
 setattr(pt_tomo.ssy, "is_disabled", False)
 setattr(pt_tomo.ssz, "is_disabled", True)
 
+sd.baseline.extend([
+    kb_stage.hm_ry,
+    kb_stage.hm_x,
+    kb_stage.vm_rx,
+    kb_stage.vm_z,
+    kb_stage.vm_y,
+    kb_stage.vm_rz]
+)
+
+# KB sample stage
+sd.baseline.extend([
+    p_sbx,
+    p_sby,
+    p_sbz]
+)
 
 sd.baseline.extend([
     pt_tomo.ssx,

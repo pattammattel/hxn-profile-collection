@@ -3635,6 +3635,8 @@ def insert_xrf_map_to_pdf(scan_id = -1, elements = ["Cr", "Fe"],
     df = h.table()
     tot = len(elements)
     x_data,y_data = get_scan_positions(h)
+    #x_data = np.reshape(x_data,hdr['shape'])
+    #y_data = np.reshape(y_data,hdr['shape'])
     if tot ==1:
         cols = 1
     else:
@@ -3853,6 +3855,32 @@ def plot_data(sid = -1,  elem = 'Pt_L', mon = 'sclr1_ch4'):
     if len(mots) == 2:
 
         plot2dfly(sid, elem,  mon)
+
+def plot_dmesh(sid = -1, elem = 'Au_L', norm = 'sclr1_ch4'):
+
+    if elem in elem_K_list:
+        energy = energy_K_list[elem_K_list == elem]
+    elif elem in elem_L_list:
+        energy = energy_L_list[elem_L_list == elem]
+    elif elem in elem_M_list:
+        energy = energy_M_list[elem_M_list == elem]
+    else:
+        raise Exception(f'Cannot found element {elem}')
+    
+    e_low = int(energy//10-15)
+    e_high = int(energy//10+15)
+
+    fp = np.sum(np.array(list(db[sid].data('xspress3_ch1')))[:,e_low:e_high],1)
+    + np.sum(np.array(list(db[sid].data('xspress3_ch2')))[:,e_low:e_high],1)
+    + np.sum(np.array(list(db[sid].data('xspress3_ch3')))[:,e_low:e_high],1)
+    plt.figure() 
+    st = db[sid].start
+    arg = st['plan_args']['args']
+    plt.imshow(np.flip(np.rot90(fp.reshape(st['shape'])),0),aspect='auto',extent=[arg[1],arg[2],arg[6],arg[5]])
+    plt.title(f"{st['scan_id']} {elem}")
+    plt.xlabel(st['motors'][0])
+    plt.ylabel(st['motors'][1]) 
+
 
 
 def mosaic_overlap_scan(dets = None, ylen = 100, xlen = 100, overlap_per = 15, dwell = 0.05,

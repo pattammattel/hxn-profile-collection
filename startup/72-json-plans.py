@@ -233,9 +233,10 @@ def tomo_2d_scan(angle,dets_,fly_motors,x_start,x_end,x_num,y_start,y_end,y_num,
         x_start_real = x_start / np.abs(np.sin(angle * np.pi / 180.))
         x_end_real = x_end / np.abs(np.sin(angle * np.pi / 180.))
         if fly_motors[2].name == 'dssz':
-            print('WARNING!!: Applying temporary scaling correction ratio to dssz motor.')
-            x_start_real *= 0.955
-            x_end_real *= 0.955
+            pass
+            # print('WARNING!!: Applying temporary scaling correction ratio to dssz motor.')
+            # x_start_real *= 0.955
+            # x_end_real *= 0.955
 
         elif fly_motors[2].name == 'zpssz':
             

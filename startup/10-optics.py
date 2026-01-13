@@ -162,7 +162,7 @@ class HxnXYPitchPositioner(MotorBundle):
 
 
 cam6 = HxnXYPositioner('XF:03IDC-OP{Stg:CAM6', name='cam6')
-dexela = HxnXYPositioner('XF:03IDC-ES{Stg:FPDet', name='cam6')
+FPDet = HxnXYPositioner('XF:03IDC-ES{Stg:FPDet', name='cam6')
 fs1_y = EpicsMotor('XF:03IDA-OP{FS:1-Ax:Y}Mtr', name='fs1_y')
 
 bpm1 = HxnXYPositioner('XF:03IDA-OP{BPM:1', name='bpm1')

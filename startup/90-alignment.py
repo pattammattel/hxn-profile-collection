@@ -987,6 +987,9 @@ def mll_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time, elem='Pt
     y = np.zeros(a_num+1)
     v = np.zeros(a_num+1)
     orig_th = smlld.dsth.position
+    fig,ax = plt.subplots(1)
+    plt_update_figure(fig)
+    ax.set_title('Alignment 1D scans')
     for i in range(a_num+1):
         yield from bps.mov(dssx,0)
         yield from bps.mov(dssz,0)
@@ -1029,6 +1032,11 @@ def mll_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time, elem='Pt
             #y[i] = tmp*np.cos(x[i]*np.pi/180.0)
             #y[i] = -tmp*np.cos(x[i]*np.pi/180.0)
             # yield from bps.mov(dssx,cen)
+        
+        points,fluo = get_fluo_data(-1,elem)
+        ax.plot(points,fluo)
+        plt_update_figure(fig)
+
 
         ##v[i] = cy
 
@@ -1047,14 +1055,18 @@ def mll_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time, elem='Pt
     r0, dr, offset= rot_fit_2(x,y)
     #insertFig(note='dsth: {} {}'.format(a_start,a_end))
 
-    yield from bps.mov(smlld.dsth, th_init)
-
     dx = -dr*np.sin(offset*np.pi/180)
     dz = -dr*np.cos(offset*np.pi/180)
 
-    #moving back to intial y position
+    print(f'{dx = :.4f} um,   {dz = :.4f} um')
+
+    print(f'MOVE relative: dsx = {dx :.1f} um, dsz = {dz :.1f} um')
+    print('Optional move relative: sbx %.1f um, sbz %.1f um'%(-r0,-dz))
+
+    #moving back to intial position
+    yield from bps.mov(smlld.dsth, th_init)
     yield from bps.mov(dssy, y_init)
-    print(f'Relative motion: {dx = :.2f}, {dz = :.2f} and sbx by {-1*dx :.2f}')
+    # print(f'Relative motion: {dx = :.2f}, {dz = :.2f} and sbx by {-1*dx :.2f}')
 
     #if move_flag:
         #yield from bps.movr(smlld.dsx, dx)
@@ -1122,7 +1134,7 @@ def mll_rot_alignment_2D(th_start, th_end, th_num, x_start, x_end, x_num,
         yield from bps.mov(dssx,0, dssz,0, smlld.dsth,th)
 
         if np.abs(x[i]) > 45.01:
-            yield from fly2dpd(dets1,
+            yield from fly2dpd(dets_fast,
                             dssz,
                             x_start,
                             x_end,
@@ -1138,7 +1150,7 @@ def mll_rot_alignment_2D(th_start, th_end, th_num, x_start, x_end, x_num,
             y[i] = cx*np.sin(x[i]*np.pi/180.0)
 
         else:
-            yield from fly2dpd(dets1,dssx,start,end,num, dssy, -2,2,20,acq_time)
+            yield from fly2dpd(dets_fast,dssx,x_start,x_end,x_num, dssy, y_start,y_end,y_num,acq_time)
             cx,cy = return_center_of_mass(-1,elem,0.5)
             y[i] = cx*np.cos(x[i]*np.pi/180.0)
 
@@ -2927,7 +2939,7 @@ def peak_bpm_x(start,end,n_steps):
                 yield from bps.sleep(2)
 
             if shutter_c_status == 0:
-                y[i] = sclr2_ch2.get()
+                y[i] = sclr2_ch3.get()
             else:
                 y[i] = sclr2_ch4.get()
 
@@ -2982,7 +2994,7 @@ def peak_bpm_y(start,end,n_steps):
                 yield from bps.sleep(2)
 
             if shutter_c_status == 0:
-                y[i] = sclr2_ch2.get()
+                y[i] = sclr2_ch3.get()
 
             else:
                 y[i] = sclr2_ch4.get()
@@ -3028,7 +3040,7 @@ def peak_the_flux():
     """ Scan the c-bpm set points to find IC3 maximum """
     try:
         #open c
-        caput("XF:03IDC-ES{Zeb:2}:SOFT_IN:B0",1)
+        # caput("XF:03IDC-ES{Zeb:2}:SOFT_IN:B0",1)
 
         if abs(caget("XF:03IDC-OP{Stg:CAM6-Ax:X}Mtr.RBV")) <10:
             raise ValueError ("CAM06 is IN, move it out and try again")
@@ -3044,7 +3056,7 @@ def peak_the_flux():
         yield from peak_bpm_y(-4,4,10)
 
         #close c
-        caput("XF:03IDC-ES{Zeb:2}:SOFT_IN:B0",0)
+        # caput("XF:03IDC-ES{Zeb:2}:SOFT_IN:B0",0)
 
     except: pass
 
@@ -3250,7 +3262,7 @@ def cam6_in():
     return move_cam6(x = 0, y = 0)
 
 def cam6_to_laser():
-    return move_cam6(x = -35.25, y = 0.45)
+    return move_cam6(x = -34.8, y = 0.45)
 
 
 def move_fs1_y(target_pos):
@@ -3267,7 +3279,7 @@ def fs_in():
     return move_fs1_y(-57)
 
 def move_dexela(x = 0, y = 0):
-    yield from bps.mov(dexela.x, x, dexela.y , y)
+    yield from bps.mov(FPDet.x, x, FPDet.y , y)
 
 
 

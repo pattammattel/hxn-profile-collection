@@ -1,31 +1,37 @@
 print(f"Loading {__file__!r} ...")
 
-from ophyd import (EpicsSignal, EpicsSignalRO)
+from ophyd import (Signal, EpicsSignal, EpicsSignalRO)
 from ophyd import (Device, Component as Cpt)
 
 from ophyd.areadetector import (AreaDetector, PixiradDetectorCam, ImagePlugin,
                                 TIFFPlugin, StatsPlugin, HDF5Plugin,
                                 ProcessPlugin, ROIPlugin, TransformPlugin,
                                 OverlayPlugin)
+from ophyd.areadetector.base import ADBase
 from ophyd.areadetector.base import ADComponent, EpicsSignalWithRBV
+from ophyd.areadetector.filestore_mixins import FileStorePluginBase
 
 from ophyd import CamBase
 
 from ophyd.areadetector.cam import AreaDetectorCam
+from collections import OrderedDict, deque
 
-
-import hxntools.handlers
+import time
 from hxntools.detectors import (HxnTimepixDetector as _HTD,
                                 HxnMerlinDetector as _HMD,
                                 BeamStatusDetector, HxnMercuryDetector,
                                 HxnDexelaDetector as _HDD)
-#from hxntools.detectors.dexela import HDF5PluginWithFileStore as _dhdf
+# from hxntools.detectors.dexela import HDF5PluginWithFileStore as _dhdf
 from hxntools.detectors.merlin import HDF5PluginWithFileStore as _mhdf
 #from hxntools.detectors.timepix import HDF5PluginWithFileStore as _thdf
 from hxntools.detectors.zebra import HxnZebra
 
+from hxntools.detectors.trigger_mixins import HxnModalBase
+
 from nslsii.ad33 import (SingleTriggerV33, StatsPluginV33, CamV33Mixin)
 
+import h5py,os
+import numpy as np
 
 
 # - 2D pixel array detectors
@@ -103,12 +109,115 @@ merlin2.ensure_nonblocking()
 class DexelaDetectorCam(CamBase):
     pass
 
+class DexelaSimulatedHDF5Plugin(FileStorePluginBase,ADBase):
+    file_write_mode = Cpt(Signal,name='',value='Single')
+    file_name = Cpt(Signal,name='',value='')
+    file_path = Cpt(Signal,name='',value='')
+    file_template = Cpt(Signal,name='',value='%s%s_%2.2d.h5')
+    file_path_exists = Cpt(Signal,name='',value=True)
+    file_number = Cpt(Signal,name='',value=1)
+    auto_increment = Cpt(Signal,name='',value=0)
+    array_counter = Cpt(Signal,name='',value=0)
+    auto_save = Cpt(Signal,name='',value=0)
+    num_capture = Cpt(Signal,name='',value=0)
 
-class HxnDexelaDetector(AreaDetector):
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.filestore_spec = 'DEX_HDF5'
+        self._asset_docs_cache = deque()
+        self.h5_handle = None
+        # self.file_write_mode = Signal(name='',value='Single')
+        # self.file_name = Signal(name='',value='')
+        # self.file_path = Signal(name='',value='')
+        # self.file_number = Signal(name='',value=0)
+    
+    def stage(self):
+        super().stage()
+        self._fn = self.file_template.get() % (
+            self._fp,
+            self.file_name.get(),
+            0,
+        )
+        self.h5_handle = h5py.File(os.path.join(self.file_path.get(),self._fn),'a')
+        xsize = self.parent.cam.array_size.array_size_x.get()
+        ysize = self.parent.cam.array_size.array_size_y.get()
+
+        maxshape = (None,xsize,ysize)
+        chunks = (16,xsize,ysize)
+
+        self.ds = self.h5_handle.create_dataset(
+            'entry/instrument/detector/data',
+            shape=(0,xsize,ysize),
+            dtype=np.int16,
+            maxshape=maxshape,
+            chunks=chunks
+        )
+        self.n_frame = 0
+
+        self._generate_resource({})
+    
+    def unstage(self):
+        if self.h5_handle:
+            self.h5_handle.close()
+        return super().unstage()
+    
+    def insert_frame(self):
+        if self.n_frame >=0:
+            self.ds.resize(self.n_frame+1,axis=0)
+            self.ds[self.n_frame,:,:] = self.parent.image1.array_data.get().reshape(self.ds.shape[1],self.ds.shape[2])
+        self.n_frame += 1
+    
+    
+class HxnDexelaDetector(AreaDetector,HxnModalBase):
     cam = Cpt(DexelaDetectorCam, 'cam1:')
     proc1 = Cpt(ProcessPlugin, 'Proc1:')
     transform1 = Cpt(TransformPlugin, 'Trans1:')
     image1 = Cpt(ImagePlugin, 'image1:')
+
+    fs = Cpt(DexelaSimulatedHDF5Plugin,'',
+               write_path_template='/data/%Y/%m/%d/',
+               root='/data',
+               reg=db.reg)
+    
+    def __init__(self,*args,**kwargs):
+        super().__init__(*args,**kwargs)
+        self.fs._parent = self
+    
+    def mode_external(self):
+        raise NotImplementedError('Dexela detector cannot be external triggered.')
+    
+    def mode_internal(self):
+        super().mode_internal()
+
+        cam = self.cam
+        cam.stage_sigs[cam.num_images] = 1
+        cam.stage_sigs[cam.image_mode] = 'Single'
+        cam.stage_sigs[cam.trigger_mode] = 'Int. Software'
+
+        count_time = self.count_time.get()
+        if count_time is not None:
+            self.stage_sigs[self.cam.acquire_time] = count_time
+            self.stage_sigs[self.cam.acquire_period] = count_time
+    
+    def unstage(self):
+        # self.fs.insert_frame() #insert last frame
+        return super().unstage()
+
+    def read(self):
+        return self.fs.read()
+    
+    def describe(self):
+        return self.fs.describe()
+        
+    def trigger(self):
+        self.cam.acquire.put(1,wait=True)
+        time.sleep(0.2)
+        self.fs.insert_frame() #insert previous frame
+        self.fs.generate_datum('dexela1_image',time.time(),{'frame':self.fs.n_frame-1})
+
+        return super().trigger()
+
+
 
 
 dexela1 = HxnDexelaDetector('XF:03IDC-ES{Dexela:1}', name='dexela1')

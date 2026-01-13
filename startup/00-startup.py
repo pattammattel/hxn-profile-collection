@@ -351,7 +351,7 @@ configure_base(
     db,
     bec=False,
     ipython_logging=False,
-    publish_documents_with_kafka=True,
+    publish_documents_with_kafka=False,
     redis_url="info.hxn.nsls2.bnl.gov",
 )
 # configure_olog(get_ipython().user_ns)
@@ -623,6 +623,10 @@ def reload_bsui():
 def bluesky_debug_mode(level='DEBUG'):
     from bluesky.log import config_bluesky_logging
     config_bluesky_logging(level=level)
+
+    import logging
+    logging.getLogger('hxntools').setLevel(logging.DEBUG)
+    logging.getLogger('hxnfly').setLevel(logging.DEBUG)
 
 # bluesky_debug_mode(level='DEBUG')
 # del one_1d_step, one_nd_step, one_shot

@@ -63,19 +63,32 @@ RASMI_laser_ref = np.load('/nsls2/data2/hxn/legacy/users/startup_parameters/68-R
 
 def get_laser_ref():
     return ((caget('XF:03IDC-ES{Pico:1}POS_1')- caget('XF:03IDC-ES{Pico:1}POS_2'))/1e6*0.689 + \
-        caget('XF:03IDC-ES{Pico:1}POS_0')/1e6 + \
-        caget('XF:03IDC-ES{PT:Smpl-Ax:ssx}Mtr.TWV') + \
-        # Tweak value used as manual offset
-        -33 + 9.83) # Additional correction
+        caget('XF:03IDC-ES{Pico:1}POS_0')/1e6 \
+        + 0.4334 + 0.2 + 3.2) # Additional correction
 
-def get_tomo_ref(angle):
+def get_tomo_ref(angle = None):
+    if angle is None:
+        angle = pt_tomo.th.user_readback.get()
     if angle < RASMI_laser_ref[0,0]:
-        return RASMI_laser_ref[0,1]
+        return 0
     if angle>RASMI_laser_ref[-1,0]:
-        return RASMI_laser_ref[-1,1]
+        return RASMI_laser_ref[-1,1] - RASMI_laser_ref[0,1]
     for i in range(len(RASMI_laser_ref)-1):
         if RASMI_laser_ref[i,0]<=angle and RASMI_laser_ref[i+1,0]>=angle:
-            return (RASMI_laser_ref[i+1,1]*(angle-RASMI_laser_ref[i,0])+RASMI_laser_ref[i,1]*(RASMI_laser_ref[i+1,0]-angle))/(RASMI_laser_ref[i+1,0]-RASMI_laser_ref[i,0])
+            return (RASMI_laser_ref[i+1,1]*(angle-RASMI_laser_ref[i,0])+RASMI_laser_ref[i,1]*(RASMI_laser_ref[i+1,0]-angle))/(RASMI_laser_ref[i+1,0]-RASMI_laser_ref[i,0])\
+                - RASMI_laser_ref[0,1]
+
+
+def get_laser_ref_y():
+    return (caget('XF:03IDC-ES{Pico:1}POS_1') +  caget('XF:03IDC-ES{Pico:1}POS_2')) /1e6/2
+
+
+def get_tomo_ref_y(angle = None):
+    if angle is None:
+        angle = pt_tomo.th.user_readback.get()
+    # Calculate mathematically
+    return -np.sin(angle/180*np.pi*2)*0.3
+        
 
 def get_tomo_drift(angle):
     if angle < RASMI_align_drift[0,0] or angle>RASMI_align_drift[-1,0]:
@@ -85,8 +98,9 @@ def get_tomo_drift(angle):
             return (RASMI_align_drift[i+1,1]*(angle-RASMI_align_drift[i,0])+RASMI_align_drift[i,1]*(RASMI_align_drift[i+1,0]-angle))/(RASMI_align_drift[i+1,0]-RASMI_align_drift[i,0])
 
 def align_sample_tomo():
-    while np.abs(get_laser_ref() - get_tomo_ref(pt_tomo.th.position))>0.05:
+    while np.abs(get_laser_ref() - get_tomo_ref(pt_tomo.th.position))>0.05 or np.abs(get_laser_ref_y() - get_tomo_ref_y(pt_tomo.th.position))>0.05:
         yield from bps.movr(ptssx,get_laser_ref() - get_tomo_ref(pt_tomo.th.position))
+        yield from bps.movr(ptssy,get_laser_ref_y() - get_tomo_ref_y(pt_tomo.th.position))
         yield from bps.sleep(1)
 
 def get_tomo_drift_y(angle):
@@ -125,6 +139,7 @@ def sample_movz(step,use_cx = False,use_sby=False):
         yield from bps.mvr(pt_tomo.sb_y,-18./1000*step)
     else:
         yield from bps.mvr(pt_tomo.ssy,-18./1000*step)
+
 def measure_proj_series(zlist,exp_time=3):
     eiger_mobile.tif_filename.put_complete=True
     z0 = zlist[0]
@@ -136,14 +151,22 @@ def measure_proj_series(zlist,exp_time=3):
         yield from bps.abs_set(eiger_mobile.cam.acquire,1)
         yield from bps.sleep(16)
 
-def rasmi_tomo(anglist,logfile):
+def rasmi_tomo(anglist,startx,endx,stepx,starty,endy,stepy,exposure_time,logfile):
+
+    # Use the tweak input box for both stages for manual correction offset
+    caput('XF:03IDC-ES{PT:Smpl-Ax:ssx}Mtr.TWV',0)
+    caput('XF:03IDC-ES{PT:Smpl-Ax:ssy}Mtr.TWV',0)
+
     yield from bps.mov(pt_tomo.th,anglist[0]-5)
     # Always scan from minus angle towards positive direction
 
     for angle in anglist:
         yield from bps.mov(pt_tomo.th,angle)
         yield from align_sample_tomo()
-        yield from pt_fly2dcontpd([eiger3],ptssx,0,6,100,ptssy,3,-3,100,0.005)
+        xoffset = caget('XF:03IDC-ES{PT:Smpl-Ax:ssx}Mtr.TWV')
+        yoffset = caget('XF:03IDC-ES{PT:Smpl-Ax:ssy}Mtr.TWV')
+        yield from pt_fly2dcontpd([eiger3],ptssx,startx+xoffset,endx+xoffset,int(stepx),\
+                                  ptssy,starty+yoffset,endy+yoffset,stepy,exposure_time)
         flog = open(logfile,'a')
         flog.write('%d %.2f\n'%(db[-1].start['scan_id'],pt_tomo.th.user_readback.value))
         flog.close()
@@ -170,12 +193,6 @@ class software_shutter:
     def unstage(self):
         caput('XF:03IDB-PPS{PSh}Cmd:Cls-Cmd',1)
         yield from bps.sleep(3)
-
-def rasmi_x_ref():
-    #return (caget("XF:03IDC-ES{Pico:1}POS_1")-caget("XF:03IDC-ES{Pico:1}POS_2"))/0.85/1e6 - ptssx.user_readback.get()
-
-    #Scanning MLL
-    return (caget("XF:03IDC-ES{Pico:1}POS_1")-caget("XF:03IDC-ES{Pico:1}POS_2"))/0.85/1e6 - ptssx.user_readback.get()*(1.666)
 
 def rasmi_interf_calib_scan(npoints):
     yield from bps.mov(pt_tomo.th,-114)

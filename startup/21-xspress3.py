@@ -1,5 +1,4 @@
 print(f"Loading {__file__!r} ...")
-
 from ophyd.device import (Component as Cpt)
 from ophyd import (Signal, EpicsSignal, EpicsSignalRO, DerivedSignal)
 
@@ -14,6 +13,12 @@ from ophyd.areadetector.filestore_mixins import FileStorePluginBase
 from ophyd.areadetector.plugins import HDF5Plugin
 
 import time
+
+import os
+if os.path.isfile('/data/users/startup_parameters/USE_RASMI'):
+    USE_RASMI = True
+else:
+    USE_RASMI = False
 
 
 class Xspress3FileStoreHXN(Xspress3FileStore):
@@ -114,11 +119,13 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
 
     # Currently only using three channels. Uncomment these to enable more
     # channels:
-    # channel4 = C(Xspress3Channel, 'C4_', channel_num=4)
-    # channel5 = C(Xspress3Channel, 'C5_', channel_num=5)
-    # channel6 = C(Xspress3Channel, 'C6_', channel_num=6)
-    # channel7 = C(Xspress3Channel, 'C7_', channel_num=7)
-    # channel8 = C(Xspress3Channel, 'C8_', channel_num=8)
+    if USE_RASMI:
+        print('[ATTENTION] Xspress3 detector channel 4 is enabled as prototype table is being used.')
+        channel4 = Cpt(Xspress3Channel, 'C4_', channel_num=4)
+    # channel5 = Cpt(Xspress3Channel, 'C5_', channel_num=5)
+    # channel6 = Cpt(Xspress3Channel, 'C6_', channel_num=6)
+    # channel7 = Cpt(Xspress3Channel, 'C7_', channel_num=7)
+    # channel8 = Cpt(Xspress3Channel, 'C8_', channel_num=8)
 
     #hdf5 = Cpt(Xspress3FileStore, 'HDF1:',
     #           write_path_template='/data/%Y/%m/%d/',
@@ -141,7 +148,10 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
             configuration_attrs = ['external_trig', 'total_points',
                                    'spectra_per_point']
         if read_attrs is None:
-            read_attrs = ['channel1', 'channel2', 'channel3', 'hdf5']
+            if not USE_RASMI:
+                read_attrs = ['channel1', 'channel2', 'channel3', 'hdf5']
+            else:
+                read_attrs = ['channel1', 'channel2', 'channel3', 'channel4', 'hdf5']
         super().__init__(prefix, configuration_attrs=configuration_attrs,
                          read_attrs=read_attrs, **kwargs)
         self._dispatch_cid = None
@@ -153,6 +163,9 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
         self.channel1.stage = lambda: []
         self.channel2.stage = lambda: []
         self.channel3.stage = lambda: []
+        if USE_RASMI:
+            self.channel4.stage = lambda: []
+
 
 
     def stage(self, *args, **kwargs):
@@ -322,7 +335,14 @@ def xspress3_roi_setup():
     num_elem = np.size(elem_list)
     if num_elem > 16:
         num_elem = 16
-    for channel in [xspress3.channel1, xspress3.channel2, xspress3.channel3]:
+    
+    if not USE_RASMI:
+        channel_used = [xspress3.channel1, xspress3.channel2, xspress3.channel3]
+    else:
+        channel_used = [xspress3.channel1, xspress3.channel2, xspress3.channel3, xspress3.channel4]
+    # for channel in [xspress3.channel1, xspress3.channel2, xspress3.channel3]:
+
+    for channel in channel_used:
         for i in range(num_elem):
             if elem_list[i] in elem_K_list:
                 energy = energy_K_list[elem_K_list == elem_list[i]]
