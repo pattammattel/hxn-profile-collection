@@ -297,6 +297,8 @@ class HXNEnergy():
 
             yield from check_for_beam_dump(1000)
 
+            yield from bps.mov(ssa2.hgap,2, ssa2.vgap,2)
+
             if sclr2_ch2.get() < ic1_init*0.25:
                 raise RuntimeError ("Ion chamber value dropped; aborting calibration")
 
@@ -593,7 +595,7 @@ def foil_calib_scan_list(elem_line = "Mn_K", saveLogFolder =  "/data/users/curre
     plt.show()
 
 def foil_calib_scan(elem_line = "Cu_K", step_size_ev = 0.5, exp_time = 0.5,
-                       saveLogFolder = "/data/users/current_user"):
+                       saveLogFolder = "/data/users/current_user", downstream_ic = 'sclr1_ch4'):
 
     """absolute start and end E
     
@@ -616,31 +618,10 @@ def foil_calib_scan(elem_line = "Cu_K", step_size_ev = 0.5, exp_time = 0.5,
     
     yield from Energy.move(startE, moveMonoPitch=False,moveMirror = "ignore")
     yield from d2scan(dets_fs,num_steps, e, 0, dE, ugap, 0, dUgap, exp_time)
-    plot_foil_calib(sid=-1, saveLogFolder = saveLogFolder, save_as = elem_line)
-
-
-def foil_calib_d2_scan(startE, endE, step_size_ev = 0.5, exp_time = 0.5,
-                       saveLogFolder = "/data/users/current_user", 
-                       save_as = "Au_Foil_calib_July11_2024"):
-
-    """absolute start and end E
-    
-    Usage:<foil_calib_d2_scan(11.919-0.025,11.919+0.075,step_size_ev=1,exp_time=0.5,
-    saveLogFolder='/data/users/current_user',save_as='Au_Foil_calib_Sep27_2024_12_26pm')
+    plot_foil_calib(sid=-1, saveLogFolder = saveLogFolder, save_as = elem_line,downstream_ic = 'downstream_ic')
 
     
-    """
-
-    dE = endE-startE
-    num_steps = int(dE/(step_size_ev*0.001))
-    dUgap = Energy.calcGap(endE)-Energy.calcGap(startE)
-    
-    yield from Energy.move(startE, moveMonoPitch=False,moveMirror = "ignore")
-    yield from d2scan(dets_fs,num_steps, e, 0, dE, ugap, 0, dUgap, exp_time)
-    plot_foil_calib(sid=-1, saveLogFolder = saveLogFolder, save_as = save_as)
-
-    
-def plot_foil_calib(sid=-1, saveLogFolder = "/data/users/current_user",save_as = "Au_L3"):
+def plot_foil_calib(sid=-1, saveLogFolder = "/data/users/current_user",save_as = "Au_L3", downstream_ic = 'sclr1_ch4'):
     
     h = db[int(sid)]
     sd = h.start["scan_id"]
@@ -651,7 +632,7 @@ def plot_foil_calib(sid=-1, saveLogFolder = "/data/users/current_user",save_as =
     dff = pd.DataFrame()
 
     en_ = np.array(df['energy'],dtype=np.float32) 
-    I = np.array(df['sclr1_ch4'],dtype=np.float32) 
+    I = np.array(df[downstream_ic],dtype=np.float32) 
     Io = np.array(df['sclr1_ch2'],dtype=np.float32) 
     spec = -1*np.log(I/Io)
 
@@ -667,7 +648,7 @@ def plot_foil_calib(sid=-1, saveLogFolder = "/data/users/current_user",save_as =
     edge_pos = en_[np.argmax(np.gradient(spec))]
     ax.axvline(x = edge_pos)
     ax.text(edge_pos,np.max(spec)*0.1,f"{edge_pos = :.4f}")
-
+    time_ = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     filename = f'HXN_nanoXANES_{save_as}_calib_{time_}.csv'
     #filename = f'HXN_nanoXANES_calib.csv'

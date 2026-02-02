@@ -1569,7 +1569,7 @@ def scan_and_fly_2dpd(detectors, xcenter, xrange, xnum, ystart, ystop, ynum, dwe
     return uid
 
 
-def pt_fly2dcontpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_start2, scan_end2, num2, exposure_time, pos_return = True, apply_tomo_drift = False, tomo_angle = None, auto_rescan = False,position_supersample= 10, **kwargs):
+def pt_fly2dcontpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_start2, scan_end2, num2, exposure_time, pos_return = True, apply_tomo_drift = False, tomo_angle = None, auto_rescan = False,position_supersample= 10, scan_downward = True, **kwargs):
     """
     Relative scan
     """
@@ -1578,6 +1578,11 @@ def pt_fly2dcontpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_star
         m1_pos = motor1.position
         m2_pos = motor2.position
         print(f"Initial positions: m1_pos={m1_pos}  m2_pos={m2_pos}")
+        if scan_downward and scan_start2<scan_end2:
+            # Always scan downward in Y axis for the stability
+            tmp = scan_start2
+            scan_start2 = scan_end2
+            scan_end2 = tmp
         do_scan = False
         try:
             center1, range1 =(scan_start1+scan_end1)/2, np.abs(scan_end1-scan_start1)
@@ -1610,7 +1615,7 @@ def pt_fly2dcontpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_star
             fg_offset = -center1/6.0
             fg_freq = 1/(2.0*num1*exposure_time)
 
-            if fg_volt < 5 and fg_offset < 1 and fg_freq < 10:
+            if fg_volt < 5 and fg_offset < 5 and fg_freq < 10:
                 yield from abs_set(pt_fg.func,"RAMP")
                 yield from abs_set(pt_fg.volt,f"{fg_volt:.{4}f}")
                 yield from abs_set(pt_fg.offset,f"{fg_offset:.{4}f}")

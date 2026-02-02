@@ -64,7 +64,28 @@ RASMI_laser_ref = np.load('/nsls2/data2/hxn/legacy/users/startup_parameters/68-R
 def get_laser_ref():
     return ((caget('XF:03IDC-ES{Pico:1}POS_1')- caget('XF:03IDC-ES{Pico:1}POS_2'))/1e6*0.689 + \
         caget('XF:03IDC-ES{Pico:1}POS_0')/1e6 \
-        + 0.4334 + 0.2 + 3.2) # Additional correction
+        - 2.0056506670000003 + 2.05 + 15.019345561000002 -3) # Additional correction
+
+def calib_rasmi_laser_ref(angle_range = np.arange(-90,91,1)):
+    input('Will recalibrate and overwrite RASMI tomography alignment lookup table, Ctrl+C now to quit, Enter to continue.')
+
+    yield from bps.mov(pt_tomo.th,angle_range[0]-1)
+    laser_ref_temp = None
+    for angle in angle_range:
+        yield from bps.mov(pt_tomo.th,angle)
+        print(f"At {angle} degree")
+        input('Move the sample to reference position with *ONLY* ptssx / Sample Scanner X axis and press ENTER')
+        if laser_ref_temp is None:
+            laser_ref_temp = np.array([angle,get_laser_ref()])
+        else:
+            laser_ref_temp = np.vstack([laser_ref_temp,np.array([angle,get_laser_ref()])])
+        
+        # Save temporary data
+        np.save('/nsls2/data2/hxn/legacy/users/startup_parameters/68-RASMI-laser-ref-tmp.npy',laser_ref_temp)
+        print('\n')
+        print(laser_ref_temp)
+    np.save('/nsls2/data2/hxn/legacy/users/startup_parameters/68-RASMI-laser-ref.npy',laser_ref_temp)
+
 
 def get_tomo_ref(angle = None):
     if angle is None:
@@ -98,9 +119,9 @@ def get_tomo_drift(angle):
             return (RASMI_align_drift[i+1,1]*(angle-RASMI_align_drift[i,0])+RASMI_align_drift[i,1]*(RASMI_align_drift[i+1,0]-angle))/(RASMI_align_drift[i+1,0]-RASMI_align_drift[i,0])
 
 def align_sample_tomo():
-    while np.abs(get_laser_ref() - get_tomo_ref(pt_tomo.th.position))>0.05 or np.abs(get_laser_ref_y() - get_tomo_ref_y(pt_tomo.th.position))>0.05:
+    while np.abs(get_laser_ref() - get_tomo_ref(pt_tomo.th.position))>0.05: # or np.abs(get_laser_ref_y() - get_tomo_ref_y(pt_tomo.th.position))>0.05:
         yield from bps.movr(ptssx,get_laser_ref() - get_tomo_ref(pt_tomo.th.position))
-        yield from bps.movr(ptssy,get_laser_ref_y() - get_tomo_ref_y(pt_tomo.th.position))
+        # yield from bps.movr(ptssy,get_laser_ref_y() - get_tomo_ref_y(pt_tomo.th.position))
         yield from bps.sleep(1)
 
 def get_tomo_drift_y(angle):
@@ -109,13 +130,54 @@ def get_tomo_drift_y(angle):
     for i in range(len(RASMI_align_drift_y)-1):
         if RASMI_align_drift_y[i,0]<=angle and RASMI_align_drift_y[i+1,0]>=angle:
             return (RASMI_align_drift_y[i+1,1]*(angle-RASMI_align_drift_y[i,0])+RASMI_align_drift_y[i,1]*(RASMI_align_drift_y[i+1,0]-angle))/(RASMI_align_drift_y[i+1,0]-RASMI_align_drift_y[i,0])
-        
+
+def match_rasmi_mcs_readback_positions():
+    """
+    Match the readback values to the setpoint values for mcs7 and 8 controllers for RASMI.
+    Run this whenever the controllers are power-cycled.
+    """
+    motor_list = [
+        pt_tomo.th,
+        pt_tomo.cx,
+        pt_tomo.cz,
+        pt_tomo.bs_x,
+        pt_tomo.bs_y,
+        pt_tomo.bs_z,
+        pt_tomo.bs_rz,
+        pt_tomo.hm_x,
+        pt_tomo.hm_y,
+        pt_tomo.hm_z,
+        pt_tomo.hm_ry,
+        pt_tomo.zp_x,
+        pt_tomo.zp_y,
+        pt_tomo.zp_z,
+        #pt_tomo.zp_rx, 
+        #pt_tomo.zp_ry,
+        pt_tomo.osa_x,
+        pt_tomo.osa_y,
+        pt_tomo.osa_z,
+        pt_tomo.sb_x,
+        # pt_tomo.sb_y,
+        pt_tomo.sb_z,
+        pt_tomo.vm_x,
+        pt_tomo.vm_y,
+        pt_tomo.vm_z,
+        pt_tomo.vm_rx,
+        pt_tomo.vm_rz,
+    ]
+    for motor in motor_list:
+        motor.set_current_position(motor.user_setpoint.get())
+        time.sleep(0.01)
+        motor.set_current_position(motor.user_setpoint.get())
+
+
 def hmll_roty(step):
     yield from bps.mvr(pt_tomo.hm_ry,1.*step)
     yield from bps.mvr(pt_tomo.hm_x,-657.*step)
 def vmll_rotx(step):
     yield from bps.mvr(pt_tomo.vm_rx,1.*step)
-    yield from bps.mvr(pt_tomo.vm_y,-30.*step)
+    #yield from bps.mvr(pt_tomo.vm_y,-30.*step)
+    yield from bps.mvr(pt_tomo.vm_y,-11*step)
 def vmll_rotz(step):
     yield from bps.mvr(pt_tomo.vm_rz,1.*step)
     yield from bps.mvr(pt_tomo.vm_y,18*step)
@@ -151,7 +213,16 @@ def measure_proj_series(zlist,exp_time=3):
         yield from bps.abs_set(eiger_mobile.cam.acquire,1)
         yield from bps.sleep(16)
 
-def rasmi_tomo(anglist,startx,endx,stepx,starty,endy,stepy,exposure_time,logfile):
+def rotate_rasmi_sample_tomo_roty(abs_angle):
+    angle_backlash = 1
+    yield from bps.mov(pt_tomo.th,abs_angle-angle_backlash)
+    yield from bps.sleep(0.5)
+    yield from bps.mvr(pt_tomo.th,angle_backlash)
+    yield from bps.sleep(0.5)
+    yield from align_sample_tomo()
+    yield from bps.sleep(0.5)
+
+def rasmi_tomo(anglist,startx,endx,stepx,starty,endy,stepy,exposure_time,logfile="/data/users/current_user/rasmi_tomo.txt",close_shutter_after_scan = False):
 
     # Use the tweak input box for both stages for manual correction offset
     caput('XF:03IDC-ES{PT:Smpl-Ax:ssx}Mtr.TWV',0)
@@ -170,8 +241,60 @@ def rasmi_tomo(anglist,startx,endx,stepx,starty,endy,stepy,exposure_time,logfile
         flog = open(logfile,'a')
         flog.write('%d %.2f\n'%(db[-1].start['scan_id'],pt_tomo.th.user_readback.value))
         flog.close()
+    if close_shutter_after_scan:
+        caput("XF:03IDB-PPS{PSh}Cmd:Cls-Cmd", 1)
 
-    caput("XF:03IDB-PPS{PSh}Cmd:Cls-Cmd", 1)
+def parse_newscan_rois(filename):
+    import configparser
+    config = configparser.ConfigParser(inline_comment_prefixes=('#',))
+    config.read(filename)
+    i = 0
+    roi = []
+    try:
+        while i < 100:
+            roi_name = 'ROI'+str(i)
+            x_mvr           = config.getfloat(roi_name,'x_mvr')
+            y_mvr           = config.getfloat(roi_name,'y_mvr')
+            x_range           = config.getfloat(roi_name,'x_range')
+            y_range           = config.getfloat(roi_name,'y_range')
+            roi.append([x_mvr,y_mvr,x_range,y_range])
+            i += 1
+    except:
+        pass
+    return roi
+
+def rasmi_auto_2d_scan_demo(startx,endx,stepx,starty,endy,stepy,exposure_time):
+
+    roi_filename = '/data/users/current_user/test/roi_ranges_bsui.txt'
+    max_roi_num = 8
+
+    try:
+        os.remove(roi_filename)
+    except:
+        pass
+
+    yield from pt_fly2dcontpd([eiger3],ptssx,startx,endx,int(stepx),\
+                                ptssy,starty,endy,stepy,exposure_time)
+    
+    print('Waiting for ROIs detection from previous scan...')
+
+    while not os.path.isfile(roi_filename):
+        yield from bps.sleep(0.5)
+
+    rois = parse_newscan_rois(roi_filename)
+    # rois = [[0.,0.,2.,2.]]
+
+    for roi in rois[:max_roi_num]:
+        startx = roi[0]
+        endx = roi[0] - roi[2]
+        starty = roi[1]
+        endy = roi[1] + roi[3]
+        print(f'Next scan: ptssx,{startx},{endx},{stepx}; ptssy,{starty},{endy},{stepy}')
+        input('press Enter to start')
+        yield from pt_fly2dcontpd([eiger3],ptssx,startx,endx,int(stepx),\
+                                ptssy,starty,endy,stepy,exposure_time)
+
+    
 
 def golden_tomo(samplename,interv,offset = 0):
      gdratio = (np.sqrt(5)-1)/2

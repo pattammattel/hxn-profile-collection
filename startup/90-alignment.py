@@ -1924,8 +1924,8 @@ def find_45_offset(data_path = "/nsls2/data/hxn/legacy/users/Beamline_Performanc
 
 def rot_stage_calib_scan(th_mtr,start_angle,end_angle,angle_step, x_start, x_end, x_num, exp_time=0.02, elem="Pt_L"):
 
-
-    ''' Usage: find_45_degree_fullrange(zpsth,-5,5,3,-12, 12,200, exp_time=0.03,elem="Au_L") '''
+    ''' Usage:  <rot_stage_calib_scan(dsth, -50, -40, 0.2, -12, 12, 240, 0.05)
+    '''
     print("Diving board line of 5 um is assumed in the fitting")
     
     time_ = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1967,6 +1967,10 @@ def rot_stage_calib_scan(th_mtr,start_angle,end_angle,angle_step, x_start, x_end
         np.savetxt(save_file, np.column_stack([np.array(scan_motor),th,w_x,x_sid]), header = header, fmt = '%s')
     
     ############### added for fitting ##############
+    plot_rot_stage_calib_scan_result(save_file)
+    return th,w_x
+
+def plot_rot_stage_calib_scan_result(save_file):
     data = np.genfromtxt(
         save_file,
         skip_header=1,          # skip the column headers
@@ -1991,8 +1995,6 @@ def rot_stage_calib_scan(th_mtr,start_angle,end_angle,angle_step, x_start, x_end
     plt.title(f"sx = {sx_fit:.3f}, sz = {sz_fit:.3f}, line offset = {np.rad2deg(b_fit):.3f}, stage offset = {np.rad2deg(c_fit):.3f}")
     plt.xlabel('th')
     print(f"sx = {sx_fit:.3f}, sz = {sz_fit:.3f}, line offset = {b_fit:.3f}, stage offset = {c_fit:.3f}")
-
-    return th,w_x
 
 # Define the model function to fit the width of diving board line
 def x_fitting(x, sx, b, c):

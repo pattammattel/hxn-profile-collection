@@ -871,6 +871,7 @@ def flyscan_pd(detectors, start_signal, total_points, dwell, *,
     @run_decorator(md=md)
     def plan():
         if verbose:
+            t_startfly = tic()
             print("Starting the plan ...")
             print(f"flying_zebra.detectors={panda_flyer.detectors}")
 
@@ -1225,13 +1226,20 @@ def fly2dpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_start2, sca
             yield from bps.abs_set(panda1.pulse3.delay_units,'s')
             yield from bps.abs_set(panda1.pulse3.pulses,position_supersample)
 
-            # PULSE 4 is modified on PandABox to read Zebra output pulse and add a delay to that for triggering scalers
-            # yield from bps.abs_set(panda1.pulse4.width,exposure_time-dead_time)
-            # yield from bps.abs_set(panda1.pulse4.width_units,'s')
-            # yield from bps.abs_set(panda1.pulse4.step,exposure_time)
-            # yield from bps.abs_set(panda1.pulse4.step_units,'s')
-            # yield from bps.abs_set(panda1.pulse4.pulses,1)
+            # PULSE 1 and PULSE 4 is modified on PandABox to read Zebra output pulse and add a delay to that for triggering scalers
+            yield from bps.abs_set(panda1.pulse1.width,0.00001000)
+            yield from bps.abs_set(panda1.pulse1.width_units,'s')
+            yield from bps.abs_set(panda1.pulse1.pulses,1)
+            yield from bps.abs_set(panda1.pulse1.trig_edge,'Rising')
+            # yield from bps.abs_set(panda1.pulse1.step,0)
+            # yield from bps.abs_set(panda1.pulse1.step_units,'s')
+            yield from bps.abs_set(panda1.pulse4.width,0.00001000)
+            yield from bps.abs_set(panda1.pulse4.width_units,'s')
+            yield from bps.abs_set(panda1.pulse4.pulses,1)
+            yield from bps.abs_set(panda1.pulse4.trig_edge,'Falling')
 
+            # yield from bps.abs_set(panda1.pulse4.step,0)
+            # yield from bps.abs_set(panda1.pulse4.step_units,'s')
             ## Move to start
             sl('#%djog=%f'%(m1_num,start1_scan))
             sl('#%djog=%f'%(m2_num,start2))
