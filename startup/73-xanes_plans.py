@@ -423,7 +423,8 @@ def generateEList_MLL_2(path_to_parameter_file, highEStart = False):
     return e_list                        
 
 
-def run_zp_xanes(path_to_parameter_file, do_confirm  =True, add_low_res_scan = False):
+def run_zp_xanes(path_to_parameter_file, do_confirm  =True, 
+                 add_low_res_scan = False):
 
     """ 
     Function to run XANES Scan. 
@@ -459,6 +460,11 @@ def run_zp_xanes(path_to_parameter_file, do_confirm  =True, add_low_res_scan = F
     with open(path_to_parameter_file,"r") as fp:
         scan_params = json.load(fp)
         fp.close()
+    
+    #AP: override someone starting the scan with stop_iter = False state
+    if scan_params['stop_iter'] == True:
+        scan_params['stop_iter'] = False
+
         
     elemParam = scan_params["elem_params"]
     # marker to track beam dump             
@@ -801,11 +807,11 @@ def run_mll_xanes(path_to_parameter_file,do_confirm =True):
                                              fly_scan_plan = [x_motor,
                                                              image_scan_i["x_start"]-extra,
                                                              image_scan_i["x_end"]+extra,
-                                                             image_scan_i["x_num"],
+                                                             image_scan_i["x_num"]//2,
                                                              y_motor,
                                                              image_scan_i["y_start"]-extra,
                                                              image_scan_i["y_end"]+extra,
-                                                             image_scan_i["y_num"],
+                                                             image_scan_i["y_num"]//2,
                                                              image_scan_i["exposure"]],
                                              com_threshold = 0.1)
         
@@ -1057,7 +1063,8 @@ def run_mll_xanes(path_to_parameter_file,do_confirm =True):
             
             if scan_params["pdf_log"]:
                 try:
-                    insert_xrf_map_to_pdf(-1,pdfElem,title_=['energy', 'sbz', 'hz'])# plot data and add to pdf
+
+                    insert_xrf_map_to_pdf(-1,scan_params["pdf_elems"],title_=['energy', 'sbz', 'hz'])# plot data and add to pdf
                 except:
                     pass
             # save the DF in the loop so quitting a scan won't affect

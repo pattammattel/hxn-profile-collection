@@ -3243,7 +3243,7 @@ def recover_scan_pos_and_find_com(scan_id, elem = "Hg_L", fly_scan_plan = [dssx,
                        fly_scan_plan[7],
                        fly_scan_plan[8])
     
-    xc, yc = return_center_of_mass(-1, "Hg_L", com_threshold)
+    xc, yc = return_center_of_mass(-1, elem, com_threshold)
     yield from bps.movr(apply_to[0], xc, apply_to[1], yc)
 
     

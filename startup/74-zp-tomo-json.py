@@ -163,12 +163,18 @@ def zp_tomo_scan_to_loop(angle, tomo_params, ic_init,tracking_file = None,add_lo
         
         #look for beam dump and ic3 threshold, ignores for code tests using json
         if not tomo_params["test"]:
+            
+            # Open C shutter
+            caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0', 1)
        
             yield from check_for_beam_dump()
 
             while (sclr2_ch2.get() < (tomo_params["ic_threshold"]*ic_init)):
                  yield from peak_the_flux()
                  ic_0 = sclr2_ch2.get()
+                
+            
+            caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0', 0)
         
         #yield from bps.mov(zpssx,0,zpssz,0)
 

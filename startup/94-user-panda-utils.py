@@ -16,14 +16,6 @@ def export_scan_header(scan_id,motorx,rangex,numx,motory,rangey,numy,angle,detec
             roi_start = detectors[0].roi1.min_xyz.get()
             f.write('det_roix_start = %d\n'%roi_start[0])
             f.write('det_roiy_start = %d\n'%roi_start[1])
-        
-        # Eiger2 image is mirrored
-        if detectors:
-            if detectors[0].name == 'eiger2':
-                f.write('mirror_image = True\n')
-            else:
-                f.write('mirror_image = False\n')
-
 
 def plotlastfluo(id=-1,elem = 'Ni'):
     st = db[id].start['scan']
@@ -273,6 +265,10 @@ def panda_zero_all_encoders():
     panda1.inenc2.setp.put(0)
     panda1.inenc3.setp.put(0)
     panda1.inenc4.setp.put(0)
+    panda2.inenc1.setp.put(0)
+    panda2.inenc2.setp.put(0)
+    panda2.inenc3.setp.put(0)
+    panda2.inenc4.setp.put(0)
     print("All panda encoders set to zero at current piezo position.")
 
 panda_live_plot = PandaLivePlot()

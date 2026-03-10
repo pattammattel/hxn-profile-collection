@@ -326,6 +326,9 @@ def load_and_queue(json_path, ):
     else:
         send_fly2d_to_queue(**params)
 
+def move_relative(mtr_name, rel_motion):
+    yield from bps.movr(mtr_name, rel_motion)
+
 
 '''
 

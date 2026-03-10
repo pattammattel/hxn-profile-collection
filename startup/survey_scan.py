@@ -210,11 +210,11 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
 
 
     
-    index = np.where(ic == 0)
-    nn = np.size(index[0])
-    for i in range(nn):
-        ii = index[0][i]
-        ic[ii] = ic[ii-1]
+    #index = np.where(ic == 0)
+    #nn = np.size(index[0])
+    #for i in range(nn):
+    #    ii = index[0][i]
+    #    ic[ii] = ic[ii-1]
     #print('done ic')
     #ic_0 = 153000
 
@@ -223,7 +223,7 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
     print(np.shape(images))
     num_frame,nnx,nny = np.shape(images)
 
-    mask = np.load('/data/users/2025Q3/TongchaoLiu_2025Q3/NaFeMnNi_111_4V/mask.npy')
+    mask = np.load('/data/users/2026Q1/Shimao_2026Q1/diff_1/mask.npy')
     #mask = np.load('/data/users/2025Q2/Liu_2025Q2/diff_3_O3NCM_3.4V/mask.npy')
 
     for i in range(num_frame):
@@ -247,7 +247,7 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
         #diff_array[:,:,i] = tmp[:,245:]
         #diff_array_d[:,:,i] = tmp[:,:245]
         diff_array[:,:,i] = np.flipud(tmp) *mask
-
+    del images
     for i in range(num_frame):
         if i == 0:
             global roi
@@ -265,6 +265,7 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
         xrf = np.squeeze(np.asfarray(list(h.data('Det1_'+elem)))+np.asfarray(list(h.data('Det2_'+elem)))+np.asfarray(list(h.data('Det3_'+elem))))
 
         #xrf = np.asfarray(eval('df.Det1_'+elem)) + np.asarray(eval('df.Det2_'+elem)) + np.asarray(eval('df.Det3_'+elem))
+    #print(np.shape(xrf),np.shape(ic))
     xrf = xrf * ic[0] / (ic + 1.e-9)
 
 
@@ -338,7 +339,22 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
                 num_x = hdr.start['shape'][0]
                 num_y = hdr.start['shape'][1]
                 #print('no num')
-    #"""
+
+
+    fn = '/data/users/2026Q1/Shimao_2026Q1/diff_8/'
+    
+    if not os.path.exists(fn):
+        os.makedirs(fn)
+    
+    
+    if save_flag:
+        #print('saving data')
+        io.imsave(fn+scan_num+'_roi.tif',roi.astype(np.float32))
+        #io.imsave(fn+scan_num+'_roi_down.tif',roi_d.astype(np.float32))
+        io.imsave(fn+scan_num+'_xrf.tif',xrf.astype(np.float32))
+        io.imsave(fn+scan_num+'_diff_data.tif',diff_array.astype(np.float16))
+        #io.imsave(fn+scan_num+'_diff_data_down.tif',diff_array_d.astype(np.float32))
+    """
     fig=plt.figure(0)
     ax = fig.add_subplot(111)
     im = ax.imshow(xrf,interpolation = 'none',aspect='auto')
@@ -361,18 +377,7 @@ def show_diff_data(sid,element,det_name='merlin1',fermat_flag=False, save_flag=F
 
     plt.show()
 
-    #"""
+    """
 
-    fn = '/data/users/2025Q3/TongchaoLiu_2025Q3/NaFeMnNi_111_D2V/'
-    
-    if not os.path.exists(fn):
-        os.makedirs(fn)
-    
-    
-    if save_flag:
-        io.imsave(fn+scan_num+'_roi.tif',roi.astype(np.float32))
-        #io.imsave(fn+scan_num+'_roi_down.tif',roi_d.astype(np.float32))
-        io.imsave(fn+scan_num+'_xrf.tif',xrf.astype(np.float32))
-        io.imsave(fn+scan_num+'_diff_data.tif',diff_array.astype(np.float32))
-        #io.imsave(fn+scan_num+'_diff_data_down.tif',diff_array_d.astype(np.float32))
+
 

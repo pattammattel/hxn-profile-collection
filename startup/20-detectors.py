@@ -191,8 +191,8 @@ class HxnDexelaDetector(AreaDetector,HxnModalBase):
 
         cam = self.cam
         cam.stage_sigs[cam.num_images] = 1
-        cam.stage_sigs[cam.image_mode] = 'Single'
-        cam.stage_sigs[cam.trigger_mode] = 'Int. Software'
+        cam.stage_sigs[cam.image_mode] = 'Multiple'
+        cam.stage_sigs[cam.trigger_mode] = 'Int. Fixed Rate'
 
         count_time = self.count_time.get()
         if count_time is not None:

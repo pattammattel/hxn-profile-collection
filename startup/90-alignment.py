@@ -1358,6 +1358,11 @@ def save_cam06_images(filename = "crl"):
         time.sleep(2)
         caput('XF:03IDC-ES{CAM:06}TIFF1:WriteFile',1)
 
+# Global variables
+z_yaw_distance = 574.668 + 581.20 + 7.2
+z1_distance = 574.668 + 395.2 - 20 + 8
+y_offset = -1.2
+cz_distance = 395.2
 
 def mov_diff(gamma, delta, r=500, calc=0, check_for_dexela = True):
 
@@ -1374,17 +1379,17 @@ def mov_diff(gamma, delta, r=500, calc=0, check_for_dexela = True):
         delta = delta * np.pi / 180
         beta = 89.337 * np.pi / 180
 
-        z_yaw = 574.668 + 581.20 + diff_z
-        z1 = 574.668 + 395.2 + diff_z
+        z_yaw = z_yaw_distance + diff_z
+        z1 = z1_distance + diff_z
         z2 = z1 + 380
-        d = 395.2
+        d = cz_distance
 
         x_yaw = np.sin(gamma) * z_yaw / np.sin(beta + gamma)
         R_yaw = np.sin(beta) * z_yaw / np.sin(beta + gamma)
         R1 = R_yaw - (z_yaw - z1)
         R2 = R_yaw - (z_yaw - z2)
-        y1 = np.tan(delta) * R1
-        y2 = np.tan(delta) * R2
+        y1 = np.tan(delta) * R1 + y_offset
+        y2 = np.tan(delta) * R2 + y_offset
         R_det = R1 / np.cos(delta) - d
         dz = r - R_det
 
@@ -1445,10 +1450,10 @@ def wh_diff(scanid = None):
 
     gamma = diff_yaw
     beta = 89.337 * np.pi / 180
-    z_yaw = 574.668 + 581.20 + diff_z
-    z1 = 574.668 + 395.2 + diff_z
+    z_yaw = z_yaw_distance + diff_z
+    z1 = z1_distance + diff_z
     z2 = z1 + 380
-    d = 395.2
+    d = cz_distance
 
     x_yaw = np.sin(gamma) * z_yaw / np.sin(beta + gamma)
     R_yaw = np.sin(beta) * z_yaw / np.sin(beta + gamma)
@@ -1460,11 +1465,11 @@ def wh_diff(scanid = None):
         print('Not a pure gamma rotation')
         return -1,-1,-1
 
-    elif abs(diff_y1 / R1 - diff_y2 / R2) > 0.01:
+    elif abs((diff_y1 - y_offset) / R1 - (diff_y2 - y_offset) / R2) > 0.01:
         print('Not a pure delta rotation')
         return -1,-1,-1
     else:
-        delta = np.arctan(diff_y1 / R1)
+        delta = np.arctan((diff_y1- y_offset) / R1)
         R_det = R1 / np.cos(delta) - d + diff_cz
 
 
@@ -1922,14 +1927,16 @@ def find_45_offset(data_path = "/nsls2/data/hxn/legacy/users/Beamline_Performanc
     return optimal_offset
 
 
-def rot_stage_calib_scan(th_mtr,start_angle,end_angle,angle_step, x_start, x_end, x_num, exp_time=0.02, elem="Pt_L"):
+def rot_stage_calib_scan(th_mtr,start_angle,end_angle,angle_step, x_start, x_end, x_num, exp_time=0.02, elem="Pt_L", sample="Diving board"):
 
-    ''' Usage:  <rot_stage_calib_scan(dsth, -50, -40, 0.2, -12, 12, 240, 0.05)
+    ''' Usage:  <rot_stage_calib_scan(dsth, -50, -40, 0.2, -12, 12, 240, 0.05, elem="Pt_L", sample="Diving board" )
+    Watch out for the pitch sign; if the scan should go positive, the scan pitch must also be positive
     '''
     print("Diving board line of 5 um is assumed in the fitting")
     
     time_ = datetime.now().strftime("%Y%m%d_%H%M%S")
     save_name = f"find_45_{th_mtr.name}_{start_angle}_to_{end_angle}_{time_}"
+
     header = "scan_motor th wx sid"
 
     if th_mtr == dsth:
@@ -1963,14 +1970,20 @@ def rot_stage_calib_scan(th_mtr,start_angle,end_angle,angle_step, x_start, x_end
         th[i]=th_mtr.position
         yield from bps.sleep(1)
         
-        save_file = f"/nsls2/data/hxn/legacy/users/Beamline_Performance/find_45_scans/{save_name}.txt"
-        np.savetxt(save_file, np.column_stack([np.array(scan_motor),th,w_x,x_sid]), header = header, fmt = '%s')
+    save_file = f"/nsls2/data/hxn/legacy/users/Beamline_Performance/find_45_scans/{save_name}.txt"
+    np.savetxt(save_file, np.column_stack([np.array(scan_motor),th,w_x,x_sid]), header = header, fmt = '%s')
     
     ############### added for fitting ##############
-    plot_rot_stage_calib_scan_result(save_file)
+
+    if sample in ['Diving board','diving board']:
+        plot_rot_stage_calib_scan_result_with_diving_board(save_file)
+    elif sample in ['Rod', 'rod']:
+        plot_rot_stage_calib_scan_result_with_rod(save_file)
     return th,w_x
 
-def plot_rot_stage_calib_scan_result(save_file):
+
+
+def plot_rot_stage_calib_scan_result_with_diving_board(save_file):
     data = np.genfromtxt(
         save_file,
         skip_header=1,          # skip the column headers
@@ -1996,6 +2009,33 @@ def plot_rot_stage_calib_scan_result(save_file):
     plt.xlabel('th')
     print(f"sx = {sx_fit:.3f}, sz = {sz_fit:.3f}, line offset = {b_fit:.3f}, stage offset = {c_fit:.3f}")
 
+
+def plot_rot_stage_calib_scan_result_with_rod(save_file):
+    data = np.genfromtxt(
+        save_file,
+        skip_header=1,          # skip the column headers
+        dtype=None,             # let numpy guess types (object array)
+        encoding="utf-8"        # needed for Python 3 to handle strings
+    )
+    motor = data["f0"]
+    th = np.deg2rad(data["f1"])
+    w = data["f2"]
+
+    popt, pcov = curve_fit(
+        lambda x, sx, sz, b, c: xz_rod_fitting(x, motor, sx, sz, b, c),
+        th, w,
+        p0=[1, 1, 1.2, 0.01],
+        bounds=([0.95, 0.95, .5, -np.pi], [1.05, 1.05, 2, np.pi])
+    )
+    sx_fit,sz_fit,b_fit, c_fit = popt
+    fit_y = xz_rod_fitting(th, motor, sx_fit,sz_fit,b_fit, c_fit)
+    plt.figure()
+    plt.plot(np.rad2deg(th),w,'b.', np.rad2deg(th),fit_y,'r-')
+    plt.show(block=False)
+    plt.title(f"sx = {sx_fit:.3f}, sz = {sz_fit:.3f}, line offset = {np.rad2deg(b_fit):.3f}, stage offset = {np.rad2deg(c_fit):.3f}")
+    plt.xlabel('th')
+    print(f"sx = {sx_fit:.3f}, sz = {sz_fit:.3f}, line offset = {b_fit:.3f}, stage offset = {c_fit:.3f}")
+
 # Define the model function to fit the width of diving board line
 def x_fitting(x, sx, b, c):
     return sx*5.0* np.cos(x + b) / np.cos(x + c)
@@ -2012,6 +2052,21 @@ def xz_fitting(x, motor,sx, sz,  b, c):
         out[motor == 'dssx'] = x_fitting(x[motor=='dssx'], sx, b, c)
     return out
 
+# Define the model function to fit the width of rod (cylindrical sample)
+def x_rod_fitting(x, sx, b, c):
+    return sx*b / np.cos(x + c)
+def z_rod_fitting(x, sz, b, c):
+    return sz*b / np.abs(np.sin(x + c))
+
+def xz_rod_fitting(x, motor,sx, sz,  b, c):
+    out = np.empty_like(x,dtype=float)
+    if "zpssx" in motor or "zpssz" in motor:
+        out[motor == 'zpssz'] = z_rod_fitting(x[motor=='zpssz'], sz, b, c)
+        out[motor == 'zpssx'] = x_rod_fitting(x[motor=='zpssx'], sx, b, c)
+    elif "dssx" in motor or "zdssz" in motor:
+        out[motor == 'dssz'] = z_rod_fitting(x[motor=='dssz'], sz, b, c)
+        out[motor == 'dssx'] = x_rod_fitting(x[motor=='dssx'], sx, b, c)
+    return out
 
 def find_45_offset_scaling(data_path = "/nsls2/data/hxn/legacy/users/Beamline_Performance/45deg_calib.txt"):
 
@@ -2178,7 +2233,7 @@ def feedback_auto_off(wait_time_sec = 0.5):
 def check_for_beam_dump(
     threshold = 5000, 
     check_period = 60,
-    stabilization_delay = 900):
+    stabilization_delay = 120):
     """
     Waits until the beam intensity (sclr2_ch2) is above a given threshold,
     and then waits for a stabilization period before running recovery.
@@ -2191,20 +2246,30 @@ def check_for_beam_dump(
     stabilization_delay (float): The time (in seconds) to wait after the 
                                  beam returns for stabilization. Defaults to 900 (15 min).
     """
-    
+    i = 0
     # --- Beam-Off Loop ---
-    while (sclr2_ch2.get() < threshold):
-        print (f"Beam intensity ({sclr2_ch2.name}) is lower than {threshold}. Waiting...")
+    while (sclr2_ch2.get() < threshold) and sr_beam_current.get() <499:
+
+        if i%4 ==0:
+            print (f"IC1 intensity  = ({sclr2_ch2.get()});  Lower than {threshold = }."
+                f"\nBeam Current  = {sr_beam_current.get()}; Lower than theshold = 499 mA"
+                f"\nWaiting for recovery...\n{20*'*'}\n")
         yield from bps.sleep(check_period)
-        
-    # # --- Beam-On Recovery ---
-    # logger.info("Beam is back. Waiting for %s seconds for system stabilization.", 
-    #             stabilization_delay)
-    # yield from bps.sleep(stabilization_delay)
+
+        i+=1
+
+        if sr_beam_current.get() >499 and det_beamstatus.status:
+            print(f"Beam Current  = {sr_beam_current.get()}; Beam is back")
+            print(f" Beamline Ready = {det_beamstatus.status}")
+            break
     
-    # # --- Execute Recovery Protocol ---
-    # logger.info("Stabilization complete. Running beam dump recovery protocol.")
-    # yield from recover_from_beamdump()
+    print(f"Initiating Beam Recovery Protocol"
+          f"\nWaiting for stability for {stabilization_delay} seconds")
+    yield from bps.sleep(stabilization_delay)
+
+    print("Stabilization complete. Running beam dump recovery protocol.")
+    yield from recover_from_beamdump()
+        
 
 
 def find_edge_2D(scan_id, elem, left_flag=True):
@@ -2941,7 +3006,10 @@ def peak_bpm_x(start,end,n_steps):
                 yield from bps.sleep(2)
 
             if shutter_c_status == 0:
-                y[i] = sclr2_ch3.get()
+                if USE_RASMI:
+                    y[i] = sclr2_ch3.get()
+                else:
+                    y[i] = sclr2_ch2.get()
             else:
                 y[i] = sclr2_ch4.get()
 
@@ -2996,7 +3064,10 @@ def peak_bpm_y(start,end,n_steps):
                 yield from bps.sleep(2)
 
             if shutter_c_status == 0:
-                y[i] = sclr2_ch3.get()
+                if USE_RASMI:
+                    y[i] = sclr2_ch3.get()
+                else:
+                    y[i] = sclr2_ch2.get()
 
             else:
                 y[i] = sclr2_ch4.get()

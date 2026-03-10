@@ -279,7 +279,9 @@ def tomo_2d_scan(angle,dets_,fly_motors,x_start,x_end,x_num,y_start,y_end,y_num,
 
 def align_2d_com_scan(mtr1,x_s,x_e,x_n,mtr2,y_s,y_e,y_n,exp,elem_,
                       threshold,move_x=False,move_y=False, 
-                      x_offset = 0, y_offset = 0,tomo_use_panda = True):
+                      x_offset = 0, y_offset = 0,tomo_use_panda = True,
+                      zero_before_scan = False
+                      ):
 
 
     """
@@ -296,8 +298,14 @@ def align_2d_com_scan(mtr1,x_s,x_e,x_n,mtr2,y_s,y_e,y_n,exp,elem_,
     """
     #peform fly2d
 
+    if zero_before_scan:
+            yield from bps.mov(mtr1,0,wait=True)
+            yield from bps.mov(mtr2,0,wait=True)
+
+
+
     if not tomo_use_panda:
-        yield from fly2dpd(dets_fast_fs,
+        yield from fly2dpd(dets_fast,
                         mtr1,
                         x_s,
                         x_e,
@@ -308,7 +316,7 @@ def align_2d_com_scan(mtr1,x_s,x_e,x_n,mtr2,y_s,y_e,y_n,exp,elem_,
                         y_n,
                         exp)
     else:
-        yield from fly2dpd(dets_fast_fs,
+        yield from fly2dpd(dets_fast,
                         mtr1,
                         x_s,
                         x_e,
@@ -405,7 +413,8 @@ def tomo_scan_to_loop(angle, tomo_params, ic_init, do_y_offset = True,tracking_f
                                                 align_2d["move_y"],
                                                 align_2d["x_offset"],
                                                 align_2d["y_offset"],
-                                                tomo_params["flying_panda"])
+                                                tomo_params["flying_panda"],
+                                                align_2d["zero_before_scan"])
 
             else:
                 pass
@@ -449,8 +458,8 @@ def tomo_scan_to_loop(angle, tomo_params, ic_init, do_y_offset = True,tracking_f
                                                 align_2d["move_y"],
                                                 align_2d["x_offset"],
                                                 align_2d["y_offset"],
-                                                tomo_params["flying_panda"]
-
+                                                tomo_params["flying_panda"],
+                                                align_2d["zero_before_scan"]
                                                 )
             else:
                 pass

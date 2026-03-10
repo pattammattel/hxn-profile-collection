@@ -24,12 +24,57 @@ def plt_update_figure(fig=None):
     fig.canvas.draw()
     fig.canvas.flush_events()
 
-def plot3D(data,axis=0,index_init=None, *args, **kwargs):
+def plot_Dexela_data(scan_id):
+    hd = db[scan_id]
+    data = np.array(list(hd.data('dexela1_image')))
+    num_points = data.shape[0]
+
+    #generate titles
+    motors = hd.start['motors']
+    titles = []
+    for i in range(num_points):
+        title = ''
+        for motor in motors:
+            title += '%s  = %.2f, '%(motor,hd.table()[motor][i+1])
+        titles.append(title)
+
+    return plot3D(data,0,titles=titles)
+
+
+def plot_Dexela_data_diff(scan_id):
+    hd = db[scan_id]
+    data = np.array(list(hd.data('dexela1_image')))
+    num_points = data.shape[0]
+    data_diff = data[:num_points//2].copy()
+
+    #generate titles
+    motors = hd.start['motors']
+    titles = []
+    for i in range(num_points//2):
+        data_diff[i] = data[i*2] - data[i*2+1]
+        title = ''
+        motor = motors[0]
+        title += '%s  = %.2f, '%(motor,hd.table()[motor][i*2+1])
+        motor = motors[1]
+        title += '%s diff (%.2f) - (%.2f), '%(motor,hd.table()[motor][i*2+1],hd.table()[motor][i*2+2])
+        titles.append(title)
+
+    return plot3D(data_diff,0,index_init=0,titles=titles)
+
+def plot3D(data,axis=0,*args,index_init=None,titles = None,**kwargs):
     fig, ax = plt.subplots()
-    if index_init is None:
-        index_init = int(data.shape[axis]//2)
-    im = ax.imshow(data.take(index_init,axis=axis),*args, **kwargs)
+
+    # Invert the Y axis so the coordinates are the same with Areadetector screen
+    if axis == 0:
+        data = np.flip(data,axis=1)
+    else:
+        data = np.flip(data,axis=0)
+
+
+    im = ax.imshow(data.take(0,axis=axis),*args, **kwargs)
     fig.subplots_adjust(bottom=0.15)
+    ax.invert_yaxis()
+
     axslide = fig.add_axes([0.1, 0.03, 0.8, 0.03])
     im_slider = Slider(
         ax=axslide,
@@ -37,10 +82,15 @@ def plot3D(data,axis=0,index_init=None, *args, **kwargs):
         valmin=0,
         valmax=data.shape[axis] - 1,
         valstep=1,
-        valinit=index_init,
+        valinit=0,
     )
     def update(val):
         im.set_data(data.take(val,axis=axis))
+        if titles:
+            try:
+                ax.set_title(titles[val])
+            except:
+                ax.set_title('Error reading titles')
         fig.canvas.draw_idle()
     def keylisten(event):
         if event.key == 'left':
@@ -50,8 +100,11 @@ def plot3D(data,axis=0,index_init=None, *args, **kwargs):
 
     im_slider.on_changed(update)
     fig.canvas.mpl_connect('key_release_event',keylisten)
+    if index_init is None:
+        index_init = int(data.shape[axis]//2)
+    update(index_init)
     plt.show()
-    return im,im_slider
+    return ax,im,im_slider
 
 @functools.wraps(plt.figure)
 def figure_with_insert_fig_button(*args, **kwargs):
@@ -889,14 +942,15 @@ def plot_img_sum(sid, det = 'merlin1',norm ='sclr1_ch4',
                  roi_flag=False,x_cen=0,y_cen=0,size=0,threshold=[0,1e6]):
     h = db[int(sid)]
     sid = h.start['scan_id']
-    try:
-        imgs = np.stack(db[int(sid)].table(fill=True)[det])
+    # try:
+        # imgs = np.stack(db[int(sid)].table(fill=True)[det])
         #print("image load_error")
-    except ValueError:
-        imgs = list(h.data(det))
+    # except ValueError:
+        # imgs = list(h.data(det))
         #print("panda scan")
     #imgs = np.array(imgs)
-    imgs = np.array(np.squeeze(imgs))
+    imgs = np.squeeze(np.array(list(h.data(det))))
+    # imgs = np.array(np.squeeze(imgs))
     print("image_squeezed")
     #imgs.shape()
     #imgs[imgs>3*np.std(imgs)] = 0
@@ -909,6 +963,7 @@ def plot_img_sum(sid, det = 'merlin1',norm ='sclr1_ch4',
     if norm is None:
         mon = 1
     else:
+        mon = np.squeeze(np.array(list(h.data(norm))))
         mon = np.stack(h.table(fill=True)[norm])
     print("mono_read")
     #figure_with_insert_fig_button()

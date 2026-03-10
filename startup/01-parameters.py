@@ -92,7 +92,7 @@ from bluesky_queueserver_api import BPlan
 from bluesky_queueserver_api.zmq import REManagerAPI
 RM = REManagerAPI()
 # RM.item_execute((BPlan("fly2d", ["fs", "zebra", "sclr1", "merlin1", "xspress3"], "dssx", -1, 1, 10, "dssy", -1, 1, 10, 0.1)))
-# RM.item_add((BPlan("fly2d", ["fs", "zebra", "sclr1", "merlin1", "xspress3"], "dssx", -1, 1, 10, "dssy", -1, 1, 10, 0.3)))
+# RM.item_add((BPlan("fly2dpd", ["fs", "eiger2", "xspress3"], "dssx", -1, 1, 10, "dssy", -1, 1, 10, 0.3)))
 
 
 #XF:03IDC-VA{VT:Chm-TCG:2}P-I

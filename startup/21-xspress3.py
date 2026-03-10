@@ -276,6 +276,8 @@ class HxnXspress3Detector(HxnXspress3DetectorBase):
 
 
 xspress3 = HxnXspress3Detector('XF:03IDC-ES{Xsp:1}:', name='xspress3')
+
+
 # xspress3 = HxnXspress3Detector('XF:03IDC-ES{Xsp:3}:', name='xspress3')
 
 
@@ -343,6 +345,8 @@ def xspress3_roi_setup():
     # for channel in [xspress3.channel1, xspress3.channel2, xspress3.channel3]:
 
     for channel in channel_used:
+        # Enable channel visualization (to make rois working)
+        channel.vis_enabled.put(1)
         for i in range(num_elem):
             if elem_list[i] in elem_K_list:
                 energy = energy_K_list[elem_K_list == elem_list[i]]
