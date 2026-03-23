@@ -133,9 +133,9 @@ class PandA_Ophyd1(Device):
 
 
 panda1 = PandA_Ophyd1("XF03IDC-ES-PANDA-1:", name="panda1")
-panda1.pulse2.width.put_complete = True
 
 panda2 = PandA_Ophyd1("XF03IDC-ES-PANDA-2:", name="panda2")
+panda2.pulse2.width.put_complete = True
 
 # panda2 = PandA_Ophyd1("XF03IDC-ES-PANDA-2:", name="panda2")
 
@@ -261,7 +261,7 @@ class ExportSISDataPanda:
 
 class HXNFlyerPanda(Device):
     """
-    This is the Panda1.
+    This is the PandaBox panda1 and panda2
     """
 
     LARGE_FILE_DIRECTORY_WRITE_PATH = LARGE_FILE_DIRECTORY_PATH
@@ -655,8 +655,8 @@ class HXNFlyerPanda(Device):
         n_mcas = n_scaler_mca
         return [getattr(self._sis.channels, f"chan{_}").name for _ in range(1, n_mcas + 1)]
 
-panda_flyer = HXNFlyerPanda(panda2,[],sclr1,name="PandaFlyer")
-panda_flyer_fip = HXNFlyerPanda(panda1,[],sclr1,name="PandaFlyer_FIP")
+panda_flyer = HXNFlyerPanda(panda1,[],sclr1,name="PandaFlyer")
+panda_flyer_fip = HXNFlyerPanda(panda2,[],sclr1,name="PandaFlyer_FIP")
 
 def flyscan_pd(detectors, start_signal, total_points, dwell, *,
                       panda_flyer,

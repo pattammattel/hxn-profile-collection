@@ -748,7 +748,8 @@ def return_tip_pos(sid,elem='Cr'):
 
 
 def zp_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time, 
-                     elem='Pt_L', threshold = 0.5, neg_flag = 0, edge_flag = 0, move_flag=0, use_x_only = False):
+                     elem='Pt_L', threshold = 0.5, neg_flag = 0, 
+                     edge_flag = 0, move_flag=0, use_x_only = False):
 
     """
     <zp_rot_alignment(-30,30,5, -10, 10, 200, 0.03, 'Ni', 0.1)
@@ -800,7 +801,8 @@ def zp_rot_alignment(a_start, a_end, a_num, start, end, num, acq_time,
     print(f'{dx = :.4f} um,   {dz = :.4f} um')
 
     print(f'MOVE relative: smarx = {dx :.1f} um, smarz = {dz :.1f} um')
-    print('Optional move relative: zpsx %.4f mm, zpsz %.4f mm'%(-r0/1000,-dz/1000))
+    # print('Optional move relative: zpsx %.4f mm, zpsz %.4f mm'%(-r0/1000,-dz/1000))
+    print(f'move relative: zpsx {-r0/1000:.4f} mm')
 
     yield from bps.mov(zps.zpsth, orig_th)
 

@@ -123,7 +123,7 @@ from event_model import compose_resource
 #    bits = Cpt(BITS, "BITS:")
 #
 #
-#panda1 = PandA_Ophyd1("XF03IDC-ES-PANDA-1:", name="panda1")
+#panda2 = PandA_Ophyd1("XF03IDC-ES-PANDA-1:", name="panda2")
 #
 #
 #class ExportSISDataPanda:
@@ -203,7 +203,7 @@ from event_model import compose_resource
 #
 #class HXNFlyerPanda(Device):
 #    """
-#    This is the Panda1.
+#    This is the panda2.
 #    """
 #
 #    LARGE_FILE_DIRECTORY_WRITE_PATH = LARGE_FILE_DIRECTORY_PATH
@@ -497,7 +497,7 @@ from event_model import compose_resource
 #        n_mcas = n_scaler_mca
 #        return [getattr(self._sis.channels, f"chan{_}").name for _ in range(1, n_mcas + 1)]
 #
-#panda_flyer = HXNFlyerPanda(panda1,[],sclr3,name="PandaFlyer")
+#panda_flyer = HXNFlyerPanda(panda2,[],sclr3,name="PandaFlyer")
 #
 #class PandAHandlerHDF5(HandlerBase):
 #    """The handler to read HDF5 files produced by PandABox."""
@@ -1629,20 +1629,22 @@ def pt_fly2dcontpd(dets, motor1, scan_start1, scan_end1, num1, motor2, scan_star
             else:
                 dead_time = np.maximum(0.001,exposure_time * 0.1)
 
-            yield from bps.abs_set(panda1.pulse1.width,(exposure_time-dead_time)/2.0/position_supersample)
-            yield from bps.abs_set(panda1.pulse1.width_units,'s')
-            yield from bps.abs_set(panda1.pulse1.step,(exposure_time-dead_time)/position_supersample)
-            yield from bps.abs_set(panda1.pulse1.step_units,'s')
-            yield from bps.abs_set(panda1.pulse1.delay,(exposure_time-dead_time)/2.0/position_supersample)
-            yield from bps.abs_set(panda1.pulse1.delay_units,'s')
-            yield from bps.abs_set(panda1.pulse1.pulses,position_supersample)
+            yield from bps.abs_set(panda2.pulse1.width,(exposure_time-dead_time)/2.0/position_supersample)
+            yield from bps.abs_set(panda2.pulse1.width_units,'s')
+            yield from bps.abs_set(panda2.pulse1.step,(exposure_time-dead_time)/position_supersample)
+            yield from bps.abs_set(panda2.pulse1.step_units,'s')
+            yield from bps.abs_set(panda2.pulse1.delay,(exposure_time-dead_time)/2.0/position_supersample)
+            yield from bps.abs_set(panda2.pulse1.delay_units,'s')
+            yield from bps.abs_set(panda2.pulse1.pulses,position_supersample)
 
-            yield from bps.abs_set(panda1.pulse2.width_units,'s')
-            yield from bps.abs_set(panda1.pulse2.width,exposure_time-dead_time)
+            yield from bps.abs_set(panda2.pulse2.width_units,'s')
+            yield from bps.abs_set(panda2.pulse2.width,exposure_time-dead_time)
 
-            yield from bps.abs_set(panda1.pulse2.delay,0.0016)
-            yield from bps.abs_set(panda1.pulse2.delay_units,'s')
-            yield from bps.abs_set(panda1.pulse2.pulses,1)
+            yield from bps.abs_set(panda2.pulse2.delay,0.0016)
+            yield from bps.abs_set(panda2.pulse2.delay_units,'s')
+            yield from bps.abs_set(panda2.pulse2.pulses,1)
+
+            yield from bps.sleep(0.1) # Give pandABox time to respond
 
 
             yield from scan_and_fly_2dpd(dets, center1, range1, num1, start2, end2, num2, exposure_time, dead_time = dead_time, position_supersample = position_supersample, **kwargs)
@@ -1679,20 +1681,22 @@ def pt_timescanpd(dets, num, exposure_time, position_supersample= 10, **kwargs):
             else:
                 dead_time = np.maximum(0.001,exposure_time * 0.1)
 
-            yield from bps.abs_set(panda1.pulse1.width,(exposure_time-dead_time)/2.0/position_supersample)
-            yield from bps.abs_set(panda1.pulse1.width_units,'s')
-            yield from bps.abs_set(panda1.pulse1.step,(exposure_time-dead_time)/position_supersample)
-            yield from bps.abs_set(panda1.pulse1.step_units,'s')
-            yield from bps.abs_set(panda1.pulse1.delay,(exposure_time-dead_time)/2.0/position_supersample)
-            yield from bps.abs_set(panda1.pulse1.delay_units,'s')
-            yield from bps.abs_set(panda1.pulse1.pulses,position_supersample)
+            yield from bps.abs_set(panda2.pulse1.width,(exposure_time-dead_time)/2.0/position_supersample)
+            yield from bps.abs_set(panda2.pulse1.width_units,'s')
+            yield from bps.abs_set(panda2.pulse1.step,(exposure_time-dead_time)/position_supersample)
+            yield from bps.abs_set(panda2.pulse1.step_units,'s')
+            yield from bps.abs_set(panda2.pulse1.delay,(exposure_time-dead_time)/2.0/position_supersample)
+            yield from bps.abs_set(panda2.pulse1.delay_units,'s')
+            yield from bps.abs_set(panda2.pulse1.pulses,position_supersample)
 
-            yield from bps.abs_set(panda1.pulse2.width_units,'s')
-            yield from bps.abs_set(panda1.pulse2.width,exposure_time-dead_time)
+            yield from bps.abs_set(panda2.pulse2.width_units,'s')
+            yield from bps.abs_set(panda2.pulse2.width,exposure_time-dead_time)
 
-            yield from bps.abs_set(panda1.pulse2.delay,0.0016)
-            yield from bps.abs_set(panda1.pulse2.delay_units,'s')
-            yield from bps.abs_set(panda1.pulse2.pulses,1)
+            yield from bps.abs_set(panda2.pulse2.delay,0.0016)
+            yield from bps.abs_set(panda2.pulse2.delay_units,'s')
+            yield from bps.abs_set(panda2.pulse2.pulses,1)
+            
+            yield from bps.sleep(0.1) # Give pandABox time to respond
 
 
             yield from timescan_pd(dets, num, exposure_time, dead_time = dead_time, position_supersample = position_supersample, **kwargs)

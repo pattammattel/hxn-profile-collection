@@ -5,6 +5,8 @@ import os
 import sys
 import json
 import subprocess
+import shutil
+from pathlib import Path
 
 with open("/nsls2/data/hxn/shared/config/bluesky/profile_collection/startup/plot_elems.json", "r") as fp:
     xrf_elems = json.load(fp)
@@ -235,3 +237,57 @@ def copy_user_data_for_globus(users_name, proposal_number, exp_month=None, dry_r
         return None
 
     return user_dst_dir
+
+
+def copy_folder(
+    src,
+    dst,
+    *,
+    ignore_hidden=True,
+    keep_hidden=None,
+    ignore_dirs=None,
+    ignore_exts=None,
+    overwrite=False,
+):
+    from pathlib import Path
+    import shutil
+
+    src = Path(src)
+    dst = Path(dst)
+
+    if not src.exists():
+        raise FileNotFoundError(src)
+
+    if dst.exists():
+        if overwrite:
+            shutil.rmtree(dst)
+        else:
+            raise FileExistsError(dst)
+
+    keep_hidden = set(keep_hidden or [])
+    ignore_dirs = set(ignore_dirs or ["__pycache__"])
+    ignore_exts = tuple(ignore_exts or [".pyc", ".pyo"])
+
+    def ignore_func(_, contents):
+        ignored = []
+        for item in contents:
+            if ignore_hidden and item.startswith(".") and item not in keep_hidden:
+                ignored.append(item)
+            elif item in ignore_dirs:
+                ignored.append(item)
+            elif item.endswith(ignore_exts):
+                ignored.append(item)
+        return ignored
+
+    shutil.copytree(src, dst, ignore=ignore_func)
+
+    return dst
+
+def copy_diff_analysis():
+    return copy_folder(
+        "/nsls2/data/hxn/legacy/users/data_analysis/Nanodiffraction",
+        "/nsls2/data/hxn/legacy/users/current_user/Nanodiffraction",
+        overwrite=False,
+        ignore_dirs=["__pycache__", "pycdc"],
+        ignore_exts=[".pyc", ".pyo"],
+    )

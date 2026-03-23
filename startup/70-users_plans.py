@@ -3993,8 +3993,8 @@ def mosaic_overlap_scan(dets = None, ylen = 100, xlen = 100, overlap_per = 15, d
         for i in tqdm.tqdm(Y_position_abs):
                 for j in tqdm.tqdm(X_position_abs):
                     print((i,j))
-                    yield from check_for_beam_dump(threshold=5000)
-                    yield from bps.sleep(1) #cbm catchup time
+                    # yield from check_for_beam_dump(threshold=5000)
+                    # yield from bps.sleep(1) #cbm catchup time
 
                     fly_dim = scan_dim/2
 
