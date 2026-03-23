@@ -109,9 +109,9 @@ def create_local_user_dir(pi_lastname: str, cycle: str):
     # Create directory if missing
     if not os.path.exists(dir_name):
         os.makedirs(dir_name, exist_ok=True)
-        print(f"✅ Created user directory: {dir_name}")
+        print(f" Created user directory: {dir_name}")
     else:
-        print(f"ℹ️  User directory exists: {dir_name}")
+        print(f"User directory exists: {dir_name}")
 
     return dir_name
 
@@ -225,7 +225,7 @@ def open_gnome_terminal_su_copy(src_dir: str, dst_dir: str):
         "echo 'Logging in as $uname (DUO push may be required)...'; "
         f"su - $uname -c \"{rsync_cmd}\"; "
         "echo; "
-        "echo '✅ Copy finished (or cancelled).'; "
+        "echo ' Copy finished (or cancelled).'; "
         "echo 'Press Enter to close this window.'; "
         "read"
     )
@@ -240,12 +240,12 @@ def open_gnome_terminal_su_copy(src_dir: str, dst_dir: str):
 
     try:
         subprocess.Popen(gnome_cmd)
-        print(f"\n🖥️  A GNOME terminal has opened.")
+        print(f"\n A GNOME terminal has opened.")
         print(f"   From: {src_dir}")
         print(f"   To:   {dst_dir}")
         print("   Log in to complete the copy (DUO will push automatically).\n")
     except Exception as e:
-        print(f"❌ Failed to open GNOME terminal:\n{e}")
+        print(f" Failed to open GNOME terminal:\n{e}")
 
 
 def copy_data_from_proposal(proposal_id):
@@ -265,12 +265,12 @@ def copy_data_from_proposal(proposal_id):
     # --- Get source and destination paths ---
     paths = get_proposal_paths(proposal_id)
     if not paths:
-        print(f"❌ Could not determine paths for proposal {proposal_id}")
+        print(f"Could not determine paths for proposal {proposal_id}")
         return
 
     local_path, proposal_path = paths
 
-    print(f"📂 Preparing to copy data for proposal {proposal_id}:")
+    print(f" Preparing to copy data for proposal {proposal_id}:")
     print(f"   From: {local_path}")
     print(f"   To:   {proposal_path}\n")
 
