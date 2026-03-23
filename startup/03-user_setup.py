@@ -76,6 +76,8 @@ def get_proposal_info(proposal_id):
         "users": user_list
     }
 
+'''
+
 def create_local_user_dir(pi_lastname: str, cycle: str):
     """
     Create a user data directory based on PI last name and beamline cycle.
@@ -274,3 +276,5 @@ def copy_data_from_proposal(proposal_id):
 
     # --- Launch the interactive rsync copy ---
     open_gnome_terminal_su_copy(local_path, proposal_path)
+
+'''
