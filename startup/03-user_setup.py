@@ -76,44 +76,66 @@ def get_proposal_info(proposal_id):
         "users": user_list
     }
 
-'''
 
-def create_local_user_dir(pi_lastname: str, cycle: str):
+def create_local_user_dir(proposal_id):
     """
-    Create a user data directory based on PI last name and beamline cycle.
+    Create a user data directory based on proposal ID.
 
-    Directory structure:
-        /data/users/<cycle>/<pi_lastname>-<cycle>/
+    Fetches proposal info to determine PI last name and cycle, then checks 
+    for existing directories in both old and new formats:
+        Old: /data/users/<cycle>/<pi_lastname>_<cycle>/  (e.g., 2026Q1)
+        New: /nsls2/data/hxn/legacy/users/<cycle>/<pi_lastname>-<cycle>/  (e.g., 2025-3)
+
+    If a directory exists in either format, returns that path.
+    If neither exists, creates a new directory using the new format.
 
     Parameters
     ----------
-    pi_lastname : str
-        PI's last name (used in directory name)
-    cycle : str
-        Beamline cycle in the format 'YYYY-N' (e.g. '2025-3')
+    proposal_id : str or int
+        NSLS-II proposal number (e.g., 312345)
 
     Returns
     -------
-    str
+    str or None
         Full path to the created or existing user directory.
+        Returns None if proposal info cannot be retrieved.
     """
 
-    # Validate cycle format
-    if '-' not in cycle:
-        raise ValueError("Cycle format must be 'YYYY-N' (e.g., '2025-3')")
+    # Fetch proposal info
+    info = get_proposal_info(proposal_id)
+    if not info:
+        print(f"Could not fetch proposal info for ID {proposal_id}")
+        return None
 
-    # Build directory names
-    user_cycle = f"{pi_lastname}-{cycle}"
-    dir_name = f"/nsls2/data/hxn/legacy/users/{cycle}/{user_cycle}"
+    pi_lastname = info.get("pi_lastname")
+    cycle = info.get("cycle")
 
-    # Create directory if missing
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name, exist_ok=True)
-        print(f" Created user directory: {dir_name}")
-    else:
-        print(f"User directory exists: {dir_name}")
+    # Validate required info
+    if not pi_lastname or not cycle:
+        print(f"Missing PI or cycle info in proposal {proposal_id}")
+        return None
 
-    return dir_name
+    # Check for old format directory (e.g., /data/users/2026Q1/Hu_2026Q1/)
+    # Convert cycle to old format if possible (e.g., '2025-3' -> '2025Q3')
+    old_cycle = cycle.replace('-', 'Q') if '-' in cycle else cycle
+    old_dir = f"/data/users/{old_cycle}/{pi_lastname}_{old_cycle}"
+    
+    if os.path.exists(old_dir):
+        print(f"Found existing directory (old format): {old_dir}")
+        return old_dir
+
+    # Check for new format directory
+    new_dir = f"/nsls2/data/hxn/legacy/users/{cycle}/{pi_lastname}-{cycle}"
+    
+    if os.path.exists(new_dir):
+        print(f"Found existing directory (new format): {new_dir}")
+        return new_dir
+
+    # Neither exists - create new format directory
+    os.makedirs(new_dir, exist_ok=True)
+    print(f"Created user directory (new format): {new_dir}")
+    
+    return new_dir
 
 
 def create_user_dir_from_proposal(proposal_id):
@@ -139,32 +161,26 @@ def create_user_dir_from_proposal(proposal_id):
         Returns None if proposal info cannot be retrieved.
     """
 
-    # --- Fetch proposal info ---
+    # --- Create the local directory (also fetches proposal info internally) ---
+    dir_path = create_local_user_dir(proposal_id)
+    if not dir_path:
+        return None
+
+    print(f"Local user directory ready for proposal {proposal_id}: {dir_path}")
+
+    # --- Fetch proposal info again to save JSON ---
     info = get_proposal_info(proposal_id)
     if not info:
-        print(f" Could not fetch proposal info for ID {proposal_id}")
-        return None
-
-    pi_lastname = info.get("pi_lastname")
-    cycle = info.get("cycle")
-
-    # --- Validate required info ---
-    if not pi_lastname or not cycle:
-        print(f" Missing PI or cycle info in proposal {proposal_id}")
-        return None
-
-    # --- Create the local directory ---
-    dir_path = create_local_user_dir(pi_lastname, cycle)
-    print(f" Local user directory ready for proposal {proposal_id}: {dir_path}")
+        return dir_path  # Directory exists but couldn't save JSON
 
     # --- Save proposal info JSON ---
     json_path = os.path.join(dir_path, "proposal_info.json")
     try:
         with open(json_path, "w") as f:
             json.dump(info, f, indent=4)
-        print(f" Saved proposal info to: {json_path}")
+        print(f"Saved proposal info to: {json_path}")
     except Exception as e:
-        print(f" Failed to write proposal_info.json: {e}")
+        print(f"Failed to write proposal_info.json: {e}")
 
     return dir_path
 
@@ -194,13 +210,14 @@ def get_proposal_paths(proposal_id):
     if not info:
         return None
 
-    pi_lastname = info.get("pi_lastname")
     cycle = info.get("cycle")
-
-    if not pi_lastname or not cycle:
+    if not cycle:
         return None
 
-    local_path = create_local_user_dir(pi_lastname, cycle)
+    local_path = create_local_user_dir(proposal_id)
+    if not local_path:
+        return None
+        
     proposal_path = f"/nsls2/data/hxn/proposals/{cycle}/pass-{proposal_id}"
 
     return local_path, proposal_path
@@ -277,4 +294,3 @@ def copy_data_from_proposal(proposal_id):
     # --- Launch the interactive rsync copy ---
     open_gnome_terminal_su_copy(local_path, proposal_path)
 
-'''
