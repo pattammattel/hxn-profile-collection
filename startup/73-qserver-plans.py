@@ -221,6 +221,110 @@ def send_recover_pos_and_mosaic_to_queue(
     RM.item_add(plan)
     print(f" Added recovery + mosaic plan '{label}' to QServer queue.")
 
+
+def recover_pos_and_zp_xanes_plan(
+    label,
+    roi_positions,
+    json_file_path):
+    """
+    QServer plan: recover motor positions, verify beam, and run XANES scan.
+
+    This plan restores saved ROI positions, checks beam intensity,
+    and executes a XANES scan from a JSON configuration file.
+
+    Parameters
+    ----------
+    label : str
+        Name/label for the scan.
+    roi_positions : dict
+        Dictionary of motor positions from get_current_position().
+    json_file_path : str
+        Path to the JSON file containing XANES scan parameters.
+    ic1_count : float, optional
+        Minimum ion chamber count threshold for flux check (default: 55000).
+    scan_time_min : float, optional
+        Minimum scan time in minutes (default: 5.0).
+
+    Example
+    -------
+    roi = get_current_position(zp_flag=True)
+    
+    yield from recover_pos_and_zp_xanes_plan(
+        label="Pt_xanes_1",
+        roi_positions=roi,
+        json_file_path="/path/to/xanes_config.json"
+    )
+    """
+
+    print(f"▶ Starting recover_pos_and_zp_xanes_plan: {label}")
+
+    # --- Recover positions ---
+    for key, value in roi_positions.items():
+        try:
+            if key == "zp.zpz1":
+                yield from mov_zpz1(value)
+            else:
+                yield from bps.mov(eval(key), value)
+            print(f"{key} moved to {value:.3f}")
+        except Exception as exc:
+            print(f" Could not move {key} to {value:.3f}: {exc}")
+
+    # --- Beam check ---
+    yield from check_for_beam_dump(threshold=5000)
+
+    if sclr2_ch2.get() < ic1_count * 0.9:
+        print(" Flux low — performing peak_the_flux()")
+        yield from peak_the_flux()
+
+    # --- Run XANES scan ---
+    RE.md["scan_name"] = str(label)
+
+    try:
+        yield from run_zp_xanes(json_file_path, do_confirm=False)
+        print(f" Completed XANES scan: {label}")
+    except Exception as exc:
+        print(f" Error during XANES scan: {exc}")
+
+#TODO Calcuate the predicted time and send with queue 
+def send_recover_pos_and_zp_xanes_to_queue(
+    label,
+    roi_positions,
+    json_file_path):
+    """
+    Submit recover_pos_and_zp_xanes_plan to the QServer queue.
+
+    Parameters
+    ----------
+    label : str
+        Name/label for the scan.
+    roi_positions : dict
+        Dictionary of motor positions from get_current_position().
+    json_file_path : str
+        Path to the JSON file containing XANES scan parameters.
+
+    Example
+    -------
+    roi = get_current_position(zp_flag=True)
+
+    send_recover_pos_and_zp_xanes_to_queue(
+        label="Pt_xanes_1",
+        roi_positions=roi,
+        json_file_path="/nsls2/data/hxn/legacy/users/2025-3/Smith-2025-3/xanes_config.json",
+    )
+    """
+
+    # Ensure ROI positions are serializable
+    roi_serializable = {k: float(v) for k, v in roi_positions.items()}
+
+    plan = BPlan(
+        "recover_pos_and_zp_xanes_plan",
+        label,
+        roi_serializable,
+        json_file_path)
+
+    RM.item_add(plan)
+    print(f" Added recovery + XANES plan '{label}' to QServer queue.")
+
 def align_and_scan(
         dets,
         x_motor, x_start, x_end, x_num,

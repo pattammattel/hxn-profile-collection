@@ -230,7 +230,7 @@ def open_gnome_terminal_su_copy(src_dir: str, dst_dir: str):
     DUO push and password handled in terminal.
     """
 
-    rsync_cmd = f"rsync -avh --progress '{src_dir}' '{dst_dir}'"
+    rsync_cmd = f"rsync -avh --progress --stats '{src_dir}' '{dst_dir}'"
 
     shell_script = (
         "echo '---------------------------------------'; "
@@ -239,10 +239,17 @@ def open_gnome_terminal_su_copy(src_dir: str, dst_dir: str):
         "echo; "
         "read -p 'Enter your NSLS-II username: ' uname; "
         "echo; "
-        "echo 'Logging in as $uname (DUO push may be required)...'; "
-        f"su - $uname -c \"{rsync_cmd}\"; "
+        "echo \"Logging in as: $uname\"; "
+        "echo 'Enter your password (DUO push will be sent after password entry)...'; "
         "echo; "
-        "echo ' Copy finished (or cancelled).'; "
+        f"su - $uname -c \"{rsync_cmd}\"; "
+        "EXIT_CODE=$?; "
+        "echo; "
+        "if [ $EXIT_CODE -eq 0 ]; then "
+        "    echo '✓ SUCCESS: Data copy completed successfully!'; "
+        "else "
+        "    echo '✗ FAILED: Data copy did not complete (exit code: '$EXIT_CODE')'; "
+        "fi; "
         "echo 'Press Enter to close this window.'; "
         "read"
     )
@@ -286,6 +293,12 @@ def copy_data_from_proposal(proposal_id):
         return
 
     local_path, proposal_path = paths
+
+    # --- Check if destination directory exists ---
+    if not os.path.exists(proposal_path):
+        print(f"ERROR: Destination directory does not exist: {proposal_path}")
+        print(f"Please ensure the proposal directory is created before attempting to copy data.")
+        return
 
     print(f" Preparing to copy data for proposal {proposal_id}:")
     print(f"   From: {local_path}")
