@@ -570,6 +570,26 @@ def run_tomo_json_qserver_plan(path_to_json, tracking_file=None):
     yield from run_tomo_json(path_to_json, tracking_file=tracking_file)
 
 
+def run_diff_json_qserver_plan(path_to_json, tracking_file=None, do_confirm=False):
+    """
+    QServer-compatible version of run_diff_json().
+    
+    Executes a full diffraction scan using parameters from a JSON configuration file.
+    This plan can be queued and executed through QServer.
+    
+    Parameters
+    ----------
+    path_to_json : str
+        Path to the JSON configuration file containing diffraction scan parameters.
+    tracking_file : str, optional
+        Path to a file for tracking scan progress.
+    do_confirm : bool, optional
+        Whether to confirm before running the scan (default: False for QServer compatibility).
+        Set to False to prevent the plan from hanging in automated queue execution.
+    """
+    yield from run_diff_json(path_to_json, tracking_file=tracking_file, do_confirm=do_confirm)
+
+
 def send_align_and_scan_to_queue(
         label,
         dets,
@@ -690,6 +710,73 @@ def send_tomo_json_to_queue(path_to_json, tracking_file=None, execute=False):
     else:
         RM.item_add(plan)
         print(f"✅ Added tomo JSON plan from '{path_to_json}' to QServer queue.")
+
+
+def send_diff_json_to_queue(path_to_json, tracking_file=None, do_confirm=False, execute=False):
+    """
+    Adds a run_diff_json plan to the Bluesky Queue Server.
+
+    This function queues the run_diff_json plan for execution on qserver
+    instead of directly running it on the RunEngine.
+
+    Parameters
+    ----------
+    path_to_json : str
+        Path to the JSON configuration file for the diffraction scan.
+        The JSON file should contain:
+        - angle_info: dict with keys "start", "end", "angle_step"
+        - fly_motors: list of motor names as strings
+        - th_motor: name of rotation motor as string
+        - detector_names: list of detector names
+        - Other scan parameters (ic_threshold, test, axis_switch_angle, etc.)
+    tracking_file : str, optional
+        Path to a tracking file for logging scan progress. If None, no tracking
+        file is used.
+    do_confirm : bool, optional
+        Whether to confirm before running the scan (default: False for QServer compatibility).
+        Set to False to prevent the plan from hanging in automated queue execution.
+    execute : bool, optional
+        If True, execute the plan immediately. If False (default), add to queue
+        for later execution.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    When execute=False (default), the plan is added to the queue and will be
+    executed when qserver processes it.
+    When execute=True, the plan is executed immediately by qserver.
+    
+    do_confirm is set to False by default to prevent the plan from hanging
+    while waiting for user confirmation in the automated QServer environment.
+
+    Example
+    -------
+    >>> # Add to queue for later execution (no confirmation)
+    >>> send_diff_json_to_queue("/path/to/diff_config.json")
+    >>> 
+    >>> # Execute immediately (no confirmation)
+    >>> send_diff_json_to_queue("/path/to/diff_config.json", execute=True)
+    >>> 
+    >>> # With confirmation (requires manual intervention)
+    >>> send_diff_json_to_queue("/path/to/diff_config.json", do_confirm=True)
+    """
+
+    plan = BPlan(
+        "run_diff_json_qserver_plan",
+        path_to_json,
+        tracking_file,
+        do_confirm
+    )
+
+    if execute:
+        RM.item_execute(plan)
+        print(f"▶ Executing diff JSON plan from '{path_to_json}' (confirm={do_confirm})")
+    else:
+        RM.item_add(plan)
+        print(f"✅ Added diff JSON plan from '{path_to_json}' to QServer queue (confirm={do_confirm}).")
 
 
 def get_scan_num_label(plan_dict):
