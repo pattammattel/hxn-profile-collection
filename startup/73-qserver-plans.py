@@ -553,6 +553,23 @@ def align_and_scan_qserver_plan(
     )
 
 
+def run_tomo_json_qserver_plan(path_to_json, tracking_file=None):
+    """
+    QServer-compatible version of run_tomo_json().
+    
+    Executes a full tomography scan using parameters from a JSON configuration file.
+    This plan can be queued and executed through QServer.
+    
+    Parameters
+    ----------
+    path_to_json : str
+        Path to the JSON configuration file containing tomography scan parameters.
+    tracking_file : str, optional
+        Path to a file for tracking scan progress.
+    """
+    yield from run_tomo_json(path_to_json, tracking_file=tracking_file)
+
+
 def send_align_and_scan_to_queue(
         label,
         dets,
@@ -562,7 +579,8 @@ def send_align_and_scan_to_queue(
         elem='Pt_L',
         pad_frac=0.5,
         do_2d_align=False,
-        tomo_use_panda=True
+        tomo_use_panda=True,
+        execute=False
     ):
     """
     Adds an align_and_scan plan to the Bluesky Queue Server.
@@ -589,26 +607,89 @@ def send_align_and_scan_to_queue(
         Whether to run 2D COM alignment between 1D alignments
     tomo_use_panda : bool
         Use Panda trigger mode during scans
+    execute : bool, optional
+        If True, execute the plan immediately. If False (default), add to queue
+        for later execution.
     """
 
     det_names = [d.name for d in eval(dets)]
 
-    RM.item_add(
-        BPlan(
-            "align_and_scan_qserver_plan",
-            label,
-            det_names,
-            x_motor, x_start, x_end, x_num,
-            y_motor, y_start, y_end, y_num,
-            exposure,
-            elem,
-            pad_frac,
-            do_2d_align,
-            tomo_use_panda
-        )
+    plan = BPlan(
+        "align_and_scan_qserver_plan",
+        label,
+        det_names,
+        x_motor, x_start, x_end, x_num,
+        y_motor, y_start, y_end, y_num,
+        exposure,
+        elem,
+        pad_frac,
+        do_2d_align,
+        tomo_use_panda
     )
 
-    print(f"✅ Added '{label}' align_and_scan plan to QServer queue.")
+    if execute:
+        RM.item_execute(plan)
+        print(f"▶ Executing '{label}' align_and_scan plan")
+    else:
+        RM.item_add(plan)
+        print(f"✅ Added '{label}' align_and_scan plan to QServer queue.")
+
+
+def send_tomo_json_to_queue(path_to_json, tracking_file=None, execute=False):
+    """
+    Adds a run_tomo_json plan to the Bluesky Queue Server.
+
+    This function queues the run_tomo_json plan for execution on qserver
+    instead of directly running it on the RunEngine.
+
+    Parameters
+    ----------
+    path_to_json : str
+        Path to the JSON configuration file for the tomography scan.
+        The JSON file should contain:
+        - angle_info: dict with keys "start", "end", "angle_step"
+        - fly_motors: list of motor names as strings
+        - th_motor: name of rotation motor as string
+        - detector_names: list of detector names
+        - Other scan parameters (ic_threshold, test, axis_switch_angle, etc.)
+    tracking_file : str, optional
+        Path to a tracking file for logging scan progress. If None, no tracking
+        file is used.
+    execute : bool, optional
+        If True, execute the plan immediately. If False (default), add to queue
+        for later execution.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    When execute=False (default), the plan is added to the queue and will be
+    executed when qserver processes it.
+    When execute=True, the plan is executed immediately by qserver.
+
+    Example
+    -------
+    >>> # Add to queue for later execution
+    >>> send_tomo_json_to_queue("/path/to/tomo_config.json")
+    >>> 
+    >>> # Execute immediately
+    >>> send_tomo_json_to_queue("/path/to/tomo_config.json", execute=True)
+    """
+
+    plan = BPlan(
+        "run_tomo_json_qserver_plan",
+        path_to_json,
+        tracking_file
+    )
+
+    if execute:
+        RM.item_execute(plan)
+        print(f"▶ Executing tomo JSON plan from '{path_to_json}'")
+    else:
+        RM.item_add(plan)
+        print(f"✅ Added tomo JSON plan from '{path_to_json}' to QServer queue.")
 
 
 def get_scan_num_label(plan_dict):
