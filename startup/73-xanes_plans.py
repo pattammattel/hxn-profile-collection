@@ -525,6 +525,11 @@ def run_zp_xanes(path_to_parameter_file, do_confirm  =True,
 
     if multi_pos_scan:
         e_list["pos_ref_scan_id"] = 0
+        # separate log per position reference so each CSV only holds its own scans
+        pos_logs = {}
+        for ref_sid in pos_refs_scan_nums:
+            pos_logs[int(ref_sid)] = e_list.copy()
+            pos_logs[int(ref_sid)]["pos_ref_scan_id"] = int(ref_sid)
 
     
     #get the initial ic3 reading for peaking the beam
@@ -744,16 +749,16 @@ def run_zp_xanes(path_to_parameter_file, do_confirm  =True,
                     last_sid = int(caget('XF:03IDC-ES{Status}ScanID-I'))
                     e_pos = e.position
                     
-                    #Add more info to the dataframe
-                    e_list.loc[i, 'E Readback'] = e_pos #add real energy to the dataframe
-                    e_list.loc[i, "zpsth"] = zpsth.position
-                    e_list.loc[i, "scan_id"] = int(last_sid) #add scan id to the dataframe
-                    e_list.loc[i, 'TimeStamp'] = pd.Timestamp.now()
-                    e_list.loc[i, 'IC3'] = ic_3 #Ic values are useful for calibration
-                    e_list.loc[i, 'IC0'] = ic_0 #Ic values are useful for calibration
-                    e_list.loc[i, 'Peak Flux'] = fluxPeaked # recoed if peakflux was excecuted
-                    e_list.loc[i, 'IC3_before_peak'] = ic3_ #ic3 right after e change, no peaking
-                    e_list.loc[i, "pos_ref_scan_id"] = int(sid)
+                    #Add more info to this position's dataframe
+                    pos_log = pos_logs[int(sid)]
+                    pos_log.loc[i, 'E Readback'] = e_pos #add real energy to the dataframe
+                    pos_log.loc[i, "zpsth"] = zpsth.position
+                    pos_log.loc[i, "scan_id"] = int(last_sid) #add scan id to the dataframe
+                    pos_log.loc[i, 'TimeStamp'] = pd.Timestamp.now()
+                    pos_log.loc[i, 'IC3'] = ic_3 #Ic values are useful for calibration
+                    pos_log.loc[i, 'IC0'] = ic_0 #Ic values are useful for calibration
+                    pos_log.loc[i, 'Peak Flux'] = fluxPeaked # recoed if peakflux was excecuted
+                    pos_log.loc[i, 'IC3_before_peak'] = ic3_ #ic3 right after e change, no peaking
                     fluxPeaked = False #reset
                     scan_name = scan_params.get("scan_name",'')
                     if scan_params["pdf_log"]:
@@ -769,8 +774,8 @@ def run_zp_xanes(path_to_parameter_file, do_confirm  =True,
                             pass
                     
                     # save the DF in the loop so quitting a scan won't affect
-                    filename = f"HXN_nanoXANES_pos_ref_{int(sid)}_{scan_name}_{len(e_list)}_e_points.csv"
-                    e_list.to_csv(os.path.join(scan_params["save_log_to"], filename), float_format= '%.5f')
+                    filename = f"HXN_nanoXANES_pos_ref_{int(sid)}_{scan_name}_{len(pos_log)}_e_points.csv"
+                    pos_log.to_csv(os.path.join(scan_params["save_log_to"], filename), float_format= '%.5f')
 
                 caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0',0) 
                 if scan_params["pdf_log"]: save_page() #save the pdf

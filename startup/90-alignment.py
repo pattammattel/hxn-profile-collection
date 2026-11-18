@@ -169,8 +169,13 @@ def get_xrf_data_1d(h,elem ="Cr",mon ='sclr1_ch4'):
                 mon_data = mon_data[:n_xrf]
             xrf = xrf/mon_data
             
-        xrf[np.isnan(xrf)] = np.nanmean(xrf)#patch for ic3 returns zero
-        xrf[xrf==np.inf] = np.nanmean(xrf)#patch for ic3 returns zero
+        #patch for ic3 returns zero: replace nan/inf with the mean of the finite points
+        bad = ~np.isfinite(xrf)
+        if bad.all():
+            raise ValueError(f"No finite XRF values for scan {sid} after normalizing by {mon}")
+        if bad.any():
+            print(f"Warning: replacing {bad.sum()} non-finite point(s) in scan {sid}")
+            xrf[bad] = np.mean(xrf[~bad])
         
     return xdata,xrf
 

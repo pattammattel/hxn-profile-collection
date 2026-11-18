@@ -1032,14 +1032,14 @@ def run_tomo_json(path_to_json,tracking_file = None):
                  ic_0 = sclr2_ch2.get()
                  fluxPeaked = True
 
-        if (angle_bef - tomo_params['axis_switch_angle'])*(angle - tomo_params['axis_switch_angle']) <= 0:
-            axis_swap_flag = True
-            print("axis swap flagged")
-        else:
-            axis_swap_flag = False
-        angle_bef = angle
-
         if not angle in np.array(tomo_params["remove_angles"]):
+            # flag when the scan axis changes (tomo_scan_to_loop picks the axis by abs(angle))
+            switch_angle = tomo_params['axis_switch_angle']
+            axis_swap_flag = (abs(angle_bef) < switch_angle) != (abs(angle) < switch_angle)
+            if axis_swap_flag:
+                print("axis swap flagged")
+            angle_bef = angle
+
             #tomo scan at a single angle
             yield from tomo_scan_to_loop(angle,tomo_params,ic_0,
                                          do_y_offset = do_y_offset,
@@ -1079,8 +1079,9 @@ def run_tomo_json(path_to_json,tracking_file = None):
             flog.close()
             
         else:
+            #close c shutter opened for the ic3 reading
+            caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0',0)
             print(f"{angle} skipped")
-            pass
 
 
     #TODO add angles to scan; need to be better
@@ -1113,6 +1114,11 @@ def run_tomo_json(path_to_json,tracking_file = None):
             if tomo_params["remove_angles"]==None:
                 tomo_params["remove_angles"] = []
 
+            # skip removed angles before any beam checks or shutter changes
+            if angle in np.array(tomo_params["remove_angles"]):
+                print(f"{angle} skipped")
+                continue
+
             #look for beam dump and ic3 threshold, ignores for code tests using json
             if not tomo_params["test"]:
                 if sclr2_ch2.get()<1000:
@@ -1128,56 +1134,51 @@ def run_tomo_json(path_to_json,tracking_file = None):
                     ic_0 = sclr2_ch2.get()
                     fluxPeaked = True
 
-            # angle_bef carries over from the main loop
-            if (angle_bef - tomo_params['axis_switch_angle'])*(angle - tomo_params['axis_switch_angle']) <= 0:
-                axis_swap_flag = True
+            # angle_bef is the last scanned angle, carried over from the main loop
+            switch_angle = tomo_params['axis_switch_angle']
+            axis_swap_flag = (abs(angle_bef) < switch_angle) != (abs(angle) < switch_angle)
+            if axis_swap_flag:
                 print("axis swap flagged")
-            else:
-                axis_swap_flag = False
             angle_bef = angle
 
-            if not angle in np.array(tomo_params["remove_angles"]):
-                yield from tomo_scan_to_loop(angle, 
-                                             tomo_params,ic_0,
-                                             do_y_offset = do_y_offset,
-                                             tracking_file = tracking_file,
-                                             axis_swap_flag = axis_swap_flag)
+            yield from tomo_scan_to_loop(angle, 
+                                         tomo_params,ic_0,
+                                         do_y_offset = do_y_offset,
+                                         tracking_file = tracking_file,
+                                         axis_swap_flag = axis_swap_flag)
 
-                last_sid = int(caget('XF:03IDC-ES{Status}ScanID-I'))
+            last_sid = int(caget('XF:03IDC-ES{Status}ScanID-I'))
 
-                angle_rbv = th_motor.position
-                ic_3 = sclr2_ch4.get()
-                ic_0 = sclr2_ch2.get()
-                print("name", fly_motors[1].name, "position", fly_motors[1].position)
+            angle_rbv = th_motor.position
+            ic_3 = sclr2_ch4.get()
+            ic_0 = sclr2_ch2.get()
+            print("name", fly_motors[1].name, "position", fly_motors[1].position)
 
-                # append one complete row after the main-loop rows
-                new_row = {'energy_rbv': e.position,
-                           'angle': angle_rbv,
-                           'scan_id': int(last_sid),
-                           'TimeStamp': pd.Timestamp.now(),
-                           'IC3': float(ic_3),
-                           'IC0': float(ic_0),
-                           'Peak Flux': fluxPeaked,
-                           fly_motors[1].name: fly_motors[1].position}
-                angle_list = pd.concat([angle_list, pd.DataFrame([new_row])], ignore_index=True)
-                fluxPeaked = False #reset
+            # append one complete row after the main-loop rows
+            new_row = {'energy_rbv': e.position,
+                       'angle': angle_rbv,
+                       'scan_id': int(last_sid),
+                       'TimeStamp': pd.Timestamp.now(),
+                       'IC3': float(ic_3),
+                       'IC0': float(ic_0),
+                       'Peak Flux': fluxPeaked,
+                       fly_motors[1].name: fly_motors[1].position}
+            angle_list = pd.concat([angle_list, pd.DataFrame([new_row])], ignore_index=True)
+            fluxPeaked = False #reset
 
-                #close c shutter
-                caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0',0)
+            #close c shutter
+            caput('XF:03IDC-ES{Zeb:2}:SOFT_IN:B0',0)
 
-                # save the DF in the loop so quitting a scan won't affect
-                filename = f"{tomo_params.get('scan_label','')}_startID{first_sid}"
-                angle_list.to_csv(os.path.join(tomo_params.get("save_log_to", "/data/users/current_user"), filename+'.csv'),
-                                float_format= '%.5f')
-                flog = open(os.path.join(tomo_params.get("save_log_to", "/data/users/current_user"), filename+'.txt'),'a')
-                flog.write("%d %.3f\n"%(int(last_sid),angle_rbv))
-                flog.close()
-                    
+            # save the DF in the loop so quitting a scan won't affect
+            filename = f"{tomo_params.get('scan_label','')}_startID{first_sid}"
+            angle_list.to_csv(os.path.join(tomo_params.get("save_log_to", "/data/users/current_user"), filename+'.csv'),
+                            float_format= '%.5f')
+            flog = open(os.path.join(tomo_params.get("save_log_to", "/data/users/current_user"), filename+'.txt'),'a')
+            flog.write("%d %.3f\n"%(int(last_sid),angle_rbv))
+            flog.close()
+                
 
 
-            else:
-                print(f"{angle} skipped")
-                pass
 
     else:
         pass
